@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Comic Generator Test</title>
+    <style>
+        body { 
+            max-width: 800px; 
+            margin: 20px auto; 
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 8px; }
+        button { padding: 10px 20px; }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            white-space: pre-wrap;
+        }
+        .comic-panel {
+            margin: 10px 0;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Comic Generator Test Form</h1>
+    {% csrf_token %} 
+    <div class="form-group">
+        <label for="prompt">Learning Objective:</label>
+        <input type="text" id="prompt" value="Understanding how plants grow from seeds">
+    </div>
+    <div class="form-group">
+        <label for="topic">Topic:</label>
+        <input type="text" id="topic" value="My little farm">
+    </div>
+    <div class="form-group">
+        <label for="cultural_elements">Cultural Elements (comma-separated):</label>
+        <input type="text" id="cultural_elements" value="yam planting, children helping on a small family farm, sunny Ghanaian countryside">
+    </div>
+    <div class="form-group">
+        <label for="subject">Subject:</label>
+        <input type="text" id="subject" value="Science">
+    </div>
+    <div class="form-group">
+        <label for="age_group">Age Group:</label>
+        <input type="text" id="age_group" value="8-10">
+    </div>
+    <button onclick="generateComic()">Generate Comic</button>
+
+    <div id="result"></div>
+
+    <script>
+        async function generateComic() {
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            const data = {
+                prompt: document.getElementById('prompt').value,
+                topic: document.getElementById('topic').value,
+                cultural_elements: document.getElementById('cultural_elements').value.split(',').map(s => s.trim()),
+                subject: document.getElementById('subject').value,
+                age_group: document.getElementById('age_group').value
+            };
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken  // Add this line
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('result');
+                
+                // Display the response
+                resultDiv.innerHTML = '<h2>Generated Comic</h2>';
+                resultDiv.innerHTML += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                
+                // If there's an image URL, display it
+                if (result.image_url) {
+                    resultDiv.innerHTML += '<h3>Comic Panel</h3>';
+                    resultDiv.innerHTML += `<img src="${result.image_url}" class="comic-panel">`;
+                }
+                
+                // Display the text
+                if (result.text) {
+                    resultDiv.innerHTML += '<h3>Comic Script</h3>';
+                    resultDiv.innerHTML += `<pre>${result.text}</pre>`;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
