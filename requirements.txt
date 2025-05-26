@@ -1,0 +1,5 @@
+django-cors-headers
+Pillow
+django
+djangorestframework
+python-decouple

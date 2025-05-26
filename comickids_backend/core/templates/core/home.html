@@ -1,101 +1,194 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Comic Generator Test</title>
+  <head>
+    <title>Educational Comic Generator</title>
     <style>
-        body { 
-            max-width: 800px; 
-            margin: 20px auto; 
-            padding: 20px;
-            font-family: Arial, sans-serif;
-        }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input, textarea { width: 100%; padding: 8px; }
-        button { padding: 10px 20px; }
-        #result {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ccc;
-            white-space: pre-wrap;
-        }
-        .comic-panel {
-            margin: 10px 0;
-            max-width: 600px;
-        }
+      body {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      textarea {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        min-height: 100px;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      #result {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ccc;
+      }
+      .comic-panel {
+        margin: 20px 0;
+        max-width: 100%;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+      .panel-text {
+        white-space: pre-wrap;
+        background: #f5f5f5;
+        padding: 15px;
+        margin: 10px 0;
+        border-left: 3px solid #4caf50;
+      }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+      .comic-strip {
+        max-width: 100%;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .comic-strip img {
+        max-width: 100%;
+        height: auto;
+      }
+      .comic-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+        margin: 20px 0;
+      }
+      .panel-container {
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .comic-panel {
+        width: 100%;
+        height: auto;
+        display: block;
+        border: 1px solid #ddd;
+      }
+      .warning {
+        background: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 3px solid #ffeeba;
+      }
     </style>
-</head>
-<body>
-    <h1>Comic Generator Test Form</h1>
-    {% csrf_token %} 
+  </head>
+  <body>
+    <h1>Educational Comic Generator</h1>
+    {% csrf_token %}
+
     <div class="form-group">
-        <label for="prompt">Learning Objective:</label>
-        <input type="text" id="prompt" value="Understanding how plants grow from seeds">
+      <label for="prompt">Learning Objective:</label>
+      <textarea
+        id="prompt"
+        placeholder="Enter your educational topic or learning objective here. Example: Teach children about the importance of keeping their environment clean"
+      ></textarea>
     </div>
-    <div class="form-group">
-        <label for="topic">Topic:</label>
-        <input type="text" id="topic" value="My little farm">
-    </div>
-    <div class="form-group">
-        <label for="cultural_elements">Cultural Elements (comma-separated):</label>
-        <input type="text" id="cultural_elements" value="yam planting, children helping on a small family farm, sunny Ghanaian countryside">
-    </div>
-    <div class="form-group">
-        <label for="subject">Subject:</label>
-        <input type="text" id="subject" value="Science">
-    </div>
-    <div class="form-group">
-        <label for="age_group">Age Group:</label>
-        <input type="text" id="age_group" value="8-10">
-    </div>
+
     <button onclick="generateComic()">Generate Comic</button>
 
     <div id="result"></div>
 
     <script>
-        async function generateComic() {
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      async function generateComic() {
+        const csrftoken = document.querySelector(
+          "[name=csrfmiddlewaretoken]"
+        ).value;
+        const resultDiv = document.getElementById("result");
+        resultDiv.innerHTML =
+          '<div class="loading">Generating your educational comic... Please wait...</div>';
 
-            const data = {
-                prompt: document.getElementById('prompt').value,
-                topic: document.getElementById('topic').value,
-                cultural_elements: document.getElementById('cultural_elements').value.split(',').map(s => s.trim()),
-                subject: document.getElementById('subject').value,
-                age_group: document.getElementById('age_group').value
-            };
+        const data = {
+          prompt: document.getElementById("prompt").value,
+        };
 
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/generate/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken  // Add this line
-                    },
-                    body: JSON.stringify(data)
-                });
+        try {
+          const response = await fetch("/api/generate/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrftoken,
+            },
+            credentials: "include",
+            body: JSON.stringify(data),
+          });
 
-                const result = await response.json();
-                const resultDiv = document.getElementById('result');
-                
-                // Display the response
-                resultDiv.innerHTML = '<h2>Generated Comic</h2>';
-                resultDiv.innerHTML += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-                
-                // If there's an image URL, display it
-                if (result.image_url) {
-                    resultDiv.innerHTML += '<h3>Comic Panel</h3>';
-                    resultDiv.innerHTML += `<img src="${result.image_url}" class="comic-panel">`;
-                }
-                
-                // Display the text
-                if (result.text) {
-                    resultDiv.innerHTML += '<h3>Comic Script</h3>';
-                    resultDiv.innerHTML += `<pre>${result.text}</pre>`;
-                }
-            } catch (error) {
-                document.getElementById('result').innerHTML = `Error: ${error.message}`;
-            }
+          const result = await response.json();
+          console.log("API Response:", result); // Debug logging
+
+          // Clear previous content
+          resultDiv.innerHTML = "<h2>Your Educational Comic</h2>";
+
+          // Display the script
+          if (result.text) {
+            resultDiv.innerHTML += "<h3>Comic Script</h3>";
+            resultDiv.innerHTML += `<div class="panel-text">${result.text.replace(
+              /\n/g,
+              "<br>"
+            )}</div>`;
+          }
+
+          // Display single stitched image if available
+          if (result.image_url) {
+            resultDiv.innerHTML += "<h3>Generated Comic</h3>";
+            resultDiv.innerHTML += `
+                    <div class="comic-strip">
+                        <img src="${result.image_url}" alt="Generated Comic Strip" class="comic-panel">
+                    </div>`;
+          }
+          // Display multiple panels if available
+          else if (result.image_urls && result.image_urls.length > 0) {
+            resultDiv.innerHTML += "<h3>Comic Panels</h3>";
+            resultDiv.innerHTML += '<div class="comic-grid">';
+            result.image_urls.forEach((url, index) => {
+              resultDiv.innerHTML += `
+                        <div class="panel-container">
+                            <h4>Panel ${index + 1}</h4>
+                            <img src="${url}" 
+                                alt="Comic Panel ${index + 1}" 
+                                class="comic-panel"
+                                onerror="this.onerror=null; this.src='/static/images/placeholder.png';"
+                            >
+                        </div>`;
+            });
+            resultDiv.innerHTML += '</div>';
+          }
+
+          // Display any warnings
+          if (result.warning) {
+            resultDiv.innerHTML += `
+                    <div class="warning">
+                        <p>${result.warning}</p>
+                    </div>`;
+          }
+
+        } catch (error) {
+          console.error("Error:", error); // Debug logging
+          resultDiv.innerHTML = `
+                <div style="color: red; padding: 15px; background: #fff5f5; border-left: 3px solid #ff0000;">
+                    Error: ${error.message}
+                </div>`;
         }
+      }
     </script>
-</body>
+  </body>
 </html>
