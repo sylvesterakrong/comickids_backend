@@ -148,9 +148,7 @@ STATICFILES_DIRS = [
 ]
 
 # Media files configuration
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-# Ensure the media directory exists
-GENERATED_IMAGES_DIR = os.path.join(MEDIA_ROOT, "generated_images")
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+GENERATED_IMAGES_DIR = os.path.join(MEDIA_ROOT, 'generated_images')
 os.makedirs(GENERATED_IMAGES_DIR, exist_ok=True)
