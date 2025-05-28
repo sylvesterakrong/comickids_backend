@@ -1,72 +1,125 @@
-ComicKids Backend
-ComicKids Backend is a Django REST API that generates educational comic strips for Ghanaian primary school students. It uses Google Gemini for script generation and Stability AI for panel image generation, then stitches the panels together with speech bubbles overlayed using Pillow.
+# ComicKids Backend
 
-Features
-Script Generation: Uses Gemini to create a multi-panel comic script based on a learning objective.
+> An educational comic strip generator for Ghanaian primary school students, powered by AI.
 
-Panel Image Generation: Uses Stability AI to generate unique images for each panel’s scene description.
+## Overview
 
-Speech Bubble Overlay: Extracts dialogue from the script and overlays it as speech bubbles on each panel.
+ComicKids Backend is a Django REST API that generates educational comic strips. It uses:
 
-Panel Stitching: Combines all panels into a single comic strip image.
+- **Google Gemini** for script generation
+- **Stability AI** for panel image generation
+- **Pillow** for stitching panels and adding speech bubbles
 
-Media Serving: Serves generated images via Django’s media system.
+## ✨ Features
 
-Fallback Placeholders: Uses placeholder images if image generation fails.
+- 🤖 **Script Generation**: Creates multi-panel comic scripts using Gemini
+- 🎨 **Panel Image Generation**: Generates unique images via Stability AI
+- 💬 **Speech Bubble Overlay**: Adds dialogue bubbles to each panel
+- 🔄 **Panel Stitching**: Combines panels into a single comic strip
+- 📡 **Media Serving**: Serves images via Django's media system
+- ⚡ **Fallback System**: Uses placeholders if image generation fails
 
-Requirements
-Python 3.10+
-Django 4+
-Pillow
-requests
-python-decouple
-djangorestframework
-Google Gemini API key
-Stability AI API key
+## 🚀 Requirements
 
-Usage
-Visit http://127.0.0.1:8000/ to access the frontend.
+- Python 3.10+
+- Django 4+
+- Pillow
+- requests
+- python-decouple
+- djangorestframework
+- Google Gemini API key
+- Stability AI API key
 
-Use the API endpoint /api/generate/ to POST a JSON payload:
-The response will include the generated script and the URL to the stitched comic image.
+## 📦 Installation
 
-Project Structure
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/comickids_backend.git
+
+# Navigate to project directory
+cd comickids_backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file and add your API keys
+echo "GEMINI_API_KEY=your_key_here" >> .env
+echo "STABILITY_API_KEY=your_key_here" >> .env
+
+# Run migrations
+python manage.py migrate
+
+# Start the server
+python manage.py runserver
+```
+
+## 🔧 Usage
+
+### Frontend
+
+Visit `http://127.0.0.1:8000/` to access the web interface.
+
+### API Endpoint
+
+Send POST requests to `/api/generate/` with JSON payload:
+
+```json
+{
+    "prompt": "Your learning objective here"
+}
+```
+
+## 📁 Project Structure
+
+```python
+
 comickids_backend/
 ├── core/
-│   ├── [utils.py](http://_vscodecontentref_/1)         # Main logic for script, image, and comic generation
+│   ├── utils.py         # Main logic
 │   ├── views.py         # API views
-│   ├── models.py        # ComicStrip model
+│   ├── models.py        # Database models
 │   └── templates/core/
 │       └── home.html    # Frontend template
-├── media/               # Generated images (auto-created)
+├── media/               # Generated images
 ├── static/              # Static files
-├── .env                 # Environment variables (not committed)
-├── [requirements.txt](http://_vscodecontentref_/2)
+├── .env                 # Environment variables
+└── manage.py
+```
+
+comickids_backend/
+├── core/
+│   ├── utils.py         # Main logic
+│   ├── views.py         # API views
+│   ├── models.py        # Database models
+│   └── templates/core/
+│       └── home.html    # Frontend template
+├── media/               # Generated images
+├── static/             # Static files
+├── .env                # Environment variables
 └── manage.py
 
-Notes
-Make sure to add .env and media/ to your .gitignore.
-For production, set DEBUG=False and configure allowed hosts and secure settings.
-The project uses a hardcoded number of panels (NUM_PANELS = 4). You can adjust this in core/utils.py.
-License
-MIT License
+```python
 
-Acknowledgements
-Google Gemini
-Stability AI
-Django
-Pillow
-Happy comic making!
-Notes
-Make sure to add .env and media/ to your .gitignore.
-For production, set DEBUG=False and configure allowed hosts and secure settings.
-The project uses a hardcoded number of panels (NUM_PANELS = 4). You can adjust this in core/utils.py.
-License
-MIT License
+## ⚠️ Important Notes
 
-Acknowledgements
-Google Gemini
-Stability AI
-Django
-Pillow
-Happy comic making!
+- Add `.env` and `media/` to your `.gitignore`
+- For production:
+  - Set `DEBUG=False`
+  - Configure allowed hosts
+  - Set up secure settings
+- Default: 4 panels per comic (configurable in `core/utils.py`)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgements
+
+- [Google Gemini](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini)
+- [Stability AI](https://stability.ai/)
+- [Django](https://www.djangoproject.com/)
+- [Pillow](https://python-pillow.org/)
+
+---
+
+Made with ❤️ for Ghanaian education
