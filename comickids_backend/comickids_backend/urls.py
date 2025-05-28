@@ -25,7 +25,6 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
-    
     # path("", RedirectView.as_view(url="/api/")),
     path("", include("core.urls")),
 ]
