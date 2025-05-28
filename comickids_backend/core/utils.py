@@ -60,17 +60,32 @@ def ensure_placeholder_exists():
 ensure_placeholder_exists()
 
 
+def ensure_media_dirs():
+    """Ensure all required media directories exist."""
+    dirs = [
+        settings.MEDIA_ROOT,
+        os.path.join(settings.MEDIA_ROOT, "generated_images"),
+    ]
+    for directory in dirs:
+        os.makedirs(directory, exist_ok=True)
+
+
+ensure_media_dirs()
+
+
 # --- Comic Script Generation ---
 def generate_comic(
     prompt: str,
-) -> tuple[str | None, list | None]:
+) -> tuple[str | None, str | None, list | None]:
     """
     Generates a comic script and attempts to generate images, falling back to placeholders if needed.
     Returns a tuple of (script, list of image URLs)
     """
     if not API_KEY_CONFIGURED:
         print("Error in generate_comic_script: Gemini API Key not configured.")
-        return None, None
+        return None, None, None
+
+    learning_objective = prompt
 
     # --- Prompt Engineering for Script Generation ---
     enhanced_prompt = f"""
@@ -96,6 +111,14 @@ def generate_comic(
     Output the script as a clear, well-structured text. 
     
     Make sure each panel has content for dialogue and narration sections.
+    
+    Requirements:
+    - Each panel MUST have content for all three sections (Scene Description, Dialogue, Narration)
+    - Use simple, clear language appropriate for primary school students
+    - Include Ghanaian cultural elements naturally
+    - Make the story engaging and educational
+    - Ensure the dialogue progresses the story logically
+    - Make sure the narration reinforces the learning objective
 
     """
 
@@ -106,6 +129,14 @@ def generate_comic(
         if response.text:
             comic_script = response.text
             print("Debug: Script generated successfully")
+
+            # Extract title from the script
+            title = extract_title_from_script(comic_script)
+            if not title:
+                # Create a fallback title from the prompt
+                title = f"Comic: {prompt[:50]}{'...' if len(prompt) > 50 else ''}"
+            
+            print(f"Debug: Title extracted: {title}")
 
             # Generate or get placeholder images for all panels
             panel_descriptions = extract_panel_descriptions(comic_script, NUM_PANELS)
@@ -118,16 +149,16 @@ def generate_comic(
                 image_urls.append(image_url)
 
             if not image_urls:
-                print("Debug: No image URLs generated")
-                return comic_script, None
+                print("Debug: No image URLs generated, using placeholders")
+                image_urls = PLACEHOLDER_IMAGES[:NUM_PANELS]
 
-            return comic_script, image_urls
+            return title, comic_script, image_urls
         else:
             print("Script generation failed: No text returned.")
-            return None, None
+            return None, None, None
     except Exception as e:
         print(f"Error during comic script generation: {e}")
-        return None, None
+        return None, None, None
 
 
 # --- Panel Image Generation ---
@@ -211,6 +242,55 @@ def generate_panel_image(
     return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
 
 
+def extract_title_from_script(script: str) -> str | None:
+    """
+    Extract a meaningful title from the comic script.
+    Looks for the Learning Objective line and creates a short title from it.
+    """
+    try:
+        if not script or not script.strip():
+            return None
+            
+        lines = script.split("\n")
+        for line in lines:
+            line_lower = line.strip().lower()
+            
+            # Look for learning objective
+            if line_lower.startswith("learning objective:"):
+                objective = line.split(":", 1)[1].strip()
+                # Create a shorter, more title-like version
+                if len(objective) > 50:
+                    # Take first part or create a summary
+                    words = objective.split()
+                    if len(words) > 8:
+                        title = " ".join(words[:8]) + "..."
+                    else:
+                        title = objective
+                else:
+                    title = objective
+                return title.strip()
+            
+            # Alternative patterns to look for
+            elif any(keyword in line_lower for keyword in ["title:", "topic:", "subject:"]):
+                if ":" in line:
+                    title_part = line.split(":", 1)[1].strip()
+                    if title_part and len(title_part) > 3:  # Avoid very short titles
+                        return title_part[:50] + ("..." if len(title_part) > 50 else "")
+
+        # Fallback: look for the first substantial line that might be a title
+        for line in lines:
+            line = line.strip()
+            if (line and 
+                len(line) > 10 and 
+                not line.lower().startswith(('panel', 'scene', 'dialogue', 'narration')) and
+                not line.startswith(('Panel', 'Scene', 'Dialogue', 'Narration'))):
+                return line[:50] + ("..." if len(line) > 50 else "")
+
+        return None
+    except Exception as e:
+        print(f"Error extracting title: {e}")
+        return None
+
 def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
     descriptions = []
     current_desc = ""
@@ -244,12 +324,12 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
     current_panel = {"dialogue": [], "narration": ""}
     in_dialogue_section = False
     in_narration_section = False
-    
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        
+
         # Check if this is the start of a new panel
         if line.lower().startswith("panel"):
             # Save the previous panel if it has content
@@ -260,10 +340,10 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
             in_dialogue_section = False
             in_narration_section = False
             continue
-            
+
         # Check for section headers
         line_lower = line.lower()
-        
+
         # Dialogue section detection
         if "dialogue:" in line_lower or line_lower.startswith("dialogue"):
             in_dialogue_section = True
@@ -273,13 +353,16 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
                 dialogue_content = line.split(":", 1)[1].strip()
                 if dialogue_content and dialogue_content.lower() not in ["none", ""]:
                     # Clean up quotes and formatting
-                    dialogue_content = dialogue_content.strip('*"\'')
+                    dialogue_content = dialogue_content.strip("*\"'")
                     if dialogue_content:
                         current_panel["dialogue"].append(dialogue_content)
             continue
-            
+
         # Narration/Caption section detection
-        if any(keyword in line_lower for keyword in ["narration:", "caption:", "narration/caption:"]):
+        if any(
+            keyword in line_lower
+            for keyword in ["narration:", "caption:", "narration/caption:"]
+        ):
             in_narration_section = True
             in_dialogue_section = False
             # Check if narration content is on the same line
@@ -287,32 +370,32 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
                 narration_content = line.split(":", 1)[1].strip()
                 if narration_content and narration_content.lower() not in ["none", ""]:
                     # Clean up quotes and formatting
-                    narration_content = narration_content.strip('*"\'')
+                    narration_content = narration_content.strip("*\"'")
                     if narration_content:
                         current_panel["narration"] = narration_content
             continue
-            
+
         # Scene description detection (skip this section)
         if "scene description:" in line_lower or "scene:" in line_lower:
             in_dialogue_section = False
             in_narration_section = False
             continue
-            
+
         # Process content based on current section
         if in_dialogue_section:
             # Clean up bullet points, quotes, and other formatting
             clean_line = line.lstrip("*-•1234567890. ").strip()
-            clean_line = clean_line.strip('*"\'')
-            
+            clean_line = clean_line.strip("*\"'")
+
             # Skip empty lines or "none" entries
             if clean_line and clean_line.lower() != "none":
                 current_panel["dialogue"].append(clean_line)
-                
+
         elif in_narration_section:
             # Clean up formatting for narration
             clean_line = line.lstrip("*-•1234567890. ").strip()
-            clean_line = clean_line.strip('*"\'')
-            
+            clean_line = clean_line.strip("*\"'")
+
             # Skip empty lines or "none" entries
             if clean_line and clean_line.lower() != "none":
                 # If narration already exists, append to it
@@ -320,86 +403,88 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
                     current_panel["narration"] += " " + clean_line
                 else:
                     current_panel["narration"] = clean_line
-    
+
     # Don't forget to add the last panel
     if current_panel["dialogue"] or current_panel["narration"]:
         panels.append(current_panel.copy())
-    
+
     # Ensure we have exactly num_panels panels
     while len(panels) < num_panels:
         panels.append({"dialogue": [], "narration": ""})
-    
+
     # Truncate if we have too many panels
     return panels[:num_panels]
+
 
 def extract_panel_texts_robust(script: str, num_panels=4) -> list[dict]:
     """
     More robust version that handles different script formatting styles.
     """
     import re
-    
+
     panels = []
-    
+
     # Split script into panel sections using regex
-    panel_pattern = r'(?i)panel\s*\d+'
+    panel_pattern = r"(?i)panel\s*\d+"
     panel_sections = re.split(panel_pattern, script)
-    
+
     # Remove empty first section if it exists
     if panel_sections and not panel_sections[0].strip():
         panel_sections = panel_sections[1:]
-    
+
     for section in panel_sections:
         if not section.strip():
             continue
-            
+
         panel_data = {"dialogue": [], "narration": ""}
-        
+
         # Extract dialogue using multiple patterns
         dialogue_patterns = [
-            r'(?i)dialogue:\s*(.+?)(?=narration|caption|scene|panel|$)',
-            r'(?i)dialogue:\s*\n((?:.*\n?)*?)(?=narration|caption|scene|panel|$)',
+            r"(?i)dialogue:\s*(.+?)(?=narration|caption|scene|panel|$)",
+            r"(?i)dialogue:\s*\n((?:.*\n?)*?)(?=narration|caption|scene|panel|$)",
         ]
-        
+
         for pattern in dialogue_patterns:
             dialogue_match = re.search(pattern, section, re.DOTALL)
             if dialogue_match:
                 dialogue_text = dialogue_match.group(1).strip()
-                
+
                 # Split dialogue into individual lines and clean them
                 dialogue_lines = []
-                for line in dialogue_text.split('\n'):
-                    clean_line = line.strip().lstrip('*-•1234567890. ')
-                    clean_line = clean_line.strip('*"\'')
-                    if clean_line and clean_line.lower() != 'none':
+                for line in dialogue_text.split("\n"):
+                    clean_line = line.strip().lstrip("*-•1234567890. ")
+                    clean_line = clean_line.strip("*\"'")
+                    if clean_line and clean_line.lower() != "none":
                         dialogue_lines.append(clean_line)
-                
+
                 if dialogue_lines:
                     panel_data["dialogue"] = dialogue_lines
                 break
-        
+
         # Extract narration using multiple patterns
         narration_patterns = [
-            r'(?i)(?:narration|caption):\s*(.+?)(?=dialogue|scene|panel|$)',
-            r'(?i)(?:narration|caption):\s*\n((?:.*\n?)*?)(?=dialogue|scene|panel|$)',
+            r"(?i)(?:narration|caption):\s*(.+?)(?=dialogue|scene|panel|$)",
+            r"(?i)(?:narration|caption):\s*\n((?:.*\n?)*?)(?=dialogue|scene|panel|$)",
         ]
-        
+
         for pattern in narration_patterns:
             narration_match = re.search(pattern, section, re.DOTALL)
             if narration_match:
                 narration_text = narration_match.group(1).strip()
-                narration_text = narration_text.strip('*"\'')
-                
-                if narration_text and narration_text.lower() != 'none':
+                narration_text = narration_text.strip("*\"'")
+
+                if narration_text and narration_text.lower() != "none":
                     panel_data["narration"] = narration_text
                 break
-        
+
         panels.append(panel_data)
-    
+
     # Ensure we have exactly num_panels panels
     while len(panels) < num_panels:
         panels.append({"dialogue": [], "narration": ""})
-    
+
     return panels[:num_panels]
+
 
 # --- Helper function to save images (optional, for testing) ---
 def save_image(
@@ -464,32 +549,60 @@ def wrap_text(draw, text, font, max_width):
 
 
 def draw_speech_bubble(draw, text, x, y, font, max_width=300, padding=10):
-    """Draw a speech bubble with wrapped text."""
+    """Enhanced speech bubble with better styling and returns height."""
     if not text:
-        return
+        return 0
+
     lines = wrap_text(draw, text, font, max_width)
-    line_heights = [draw.textbbox((0, 0), line, font=font)[3] for line in lines]
-    bubble_width = max(draw.textlength(line, font=font) for line in lines) + (
+    if not lines:
+        return 0
+
+    # Calculate bubble dimensions
+    line_height = font.getbbox("A")[3] - font.getbbox("A")[1]
+    bubble_width = max([draw.textlength(line, font=font) for line in lines]) + (
         padding * 2
     )
-    bubble_height = sum(line_heights) + (padding * 2) + 5 * (len(lines) - 1)
-    bubble_shape = [
-        (x, y),
-        (x + bubble_width, y),
-        (x + bubble_width, y + bubble_height),
-        (x, y + bubble_height),
-    ]
-    draw.polygon(bubble_shape, fill="white", outline="black")
+    bubble_height = len(lines) * line_height + (len(lines) - 1) * 3 + (padding * 2)
+
+    # Draw bubble background with shadow
+    shadow_offset = 2
+    # Shadow
+    draw.ellipse(
+        [
+            x + shadow_offset,
+            y + shadow_offset,
+            x + bubble_width + shadow_offset,
+            y + bubble_height + shadow_offset,
+        ],
+        fill="gray",
+    )
+
+    # Main bubble
+    draw.ellipse(
+        [x, y, x + bubble_width, y + bubble_height],
+        fill="white",
+        outline="black",
+        width=2,
+    )
+
+    # Draw tail
+    tail_size = 15
     tail_points = [
         (x + 30, y + bubble_height),
-        (x + 20, y + bubble_height + 20),
-        (x + 50, y + bubble_height),
+        (x + 20, y + bubble_height + tail_size),
+        (x + 45, y + bubble_height),
     ]
-    draw.polygon(tail_points, fill="white", outline="black")
+    draw.polygon(tail_points, fill="white", outline="black", width=2)
+
+    # Draw text
     current_y = y + padding
     for line in lines:
-        draw.text((x + padding, current_y), line, fill="black", font=font)
-        current_y += line_heights[0] + 5
+        text_width = draw.textlength(line, font=font)
+        text_x = x + (bubble_width - text_width) // 2
+        draw.text((text_x, current_y), line, fill="black", font=font)
+        current_y += line_height + 3
+
+    return bubble_height + tail_size
 
 
 def draw_caption(draw, text, x, y, width, font, padding=10):
@@ -510,10 +623,41 @@ def draw_caption(draw, text, x, y, width, font, padding=10):
         current_y += text_height + 5
 
 
+def wrap_text_for_title(draw, text, font, max_width):
+    """Wrap text for title with proper line breaks."""
+    words = text.split()
+    lines = []
+    current_line = []
+
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        width = draw.textlength(test_line, font=font)
+        if width <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(" ".join(current_line))
+                current_line = [word]
+            else:
+                # Word is too long for one line, force break
+                lines.append(word)
+
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return lines
+
+
 def stitch_panels(
-    image_urls: list[str], panel_texts: list[dict], title: str = "Comic Strip"
+    image_urls: list[str],
+    panel_texts: list[dict],
+    title: str = "Comic Strip",
+    margin_width: int = 15,
+    panel_border_width: int = 3,
 ) -> str:
-    """Stitch panels together with title, dialogue bubbles, and captions."""
+    """
+    Stitch panels together with title, dialogue bubbles, captions, and black margins for distinction.
+    """
     if not image_urls:
         return None
 
@@ -535,68 +679,130 @@ def stitch_panels(
         # Set dimensions
         panel_width = 400  # Fixed width for each panel
         panel_height = 600  # Fixed height for each panel
-        title_height = 80  # Space for title at top
+        title_height = 100  # Increased space for title
         padding = 10
+
+        # Calculate total dimensions with margins
+        total_width = (panel_width * 2) + (
+            margin_width * 2
+        )  # 3 margins: left, center, right
+        total_height = (
+            (panel_height * 2) + title_height + (margin_width * 2)
+        )  # 3 margins: top, center, bottom
 
         # Resize all panels to be consistent
         panel_images = [img.resize((panel_width, panel_height)) for img in panel_images]
 
-        # Create canvas with space for title
-        canvas = Image.new(
-            "RGB", (panel_width * 2, panel_height * 2 + title_height), "white"
-        )
+        # Create canvas with black background for margins
+        canvas = Image.new("RGB", (total_width, total_height), "black")
         draw = ImageDraw.Draw(canvas)
 
         # Load fonts
         try:
-            title_font = ImageFont.truetype("arial.ttf", 36)
-            font = ImageFont.truetype("arial.ttf", 20)
+            # Try to load better fonts with fallbacks
+            title_font = ImageFont.truetype("arial.ttf", 28)
+            font = ImageFont.truetype("arial.ttf", 16)
         except:
-            title_font = ImageFont.load_default()
-            font = ImageFont.load_default()
+            try:
+                title_font = ImageFont.truetype("Arial.ttf", 28)
+                font = ImageFont.truetype("Arial.ttf", 16)
+            except:
+                try:
+                    title_font = ImageFont.load_default()
+                    font = ImageFont.load_default()
+                except:
+                    # Last resort - create basic fonts
+                    title_font = ImageFont.load_default()
+                    font = ImageFont.load_default()
 
-        # Draw title
-        title_w = draw.textlength(title, font=title_font)
-        draw.text(
-            ((panel_width * 2 - title_w) // 2, padding),
-            title,
-            font=title_font,
-            fill="black",
+        # Create title background area
+        title_bg_height = title_height - margin_width
+        draw.rectangle(
+            [margin_width, margin_width, total_width - margin_width, title_bg_height],
+            fill="white",
+            outline="black",
+            width=2,
         )
 
-        # Place panels and add text
+        # Draw title with text wrapping
+        title_lines = wrap_text_for_title(
+            draw, title, title_font, total_width - (margin_width * 4)
+        )
+
+        # Calculate title positioning
+        line_height = title_font.getbbox("A")[3] - title_font.getbbox("A")[1]
+        total_text_height = len(title_lines) * line_height + (len(title_lines) - 1) * 5
+        start_y = (
+            margin_width + (title_bg_height - margin_width - total_text_height) // 2
+        )
+
+        for i, line in enumerate(title_lines):
+            line_width = draw.textlength(line, font=title_font)
+            x = (total_width - line_width) // 2
+            y = start_y + i * (line_height + 5)
+            draw.text((x, y), line, font=title_font, fill="black")
+
+        # Place panels with margins and borders
+        panel_positions = [
+            (margin_width, title_height + margin_width),  # Top-left
+            (margin_width * 2 + panel_width, title_height + margin_width),  # Top-right
+            (
+                margin_width,
+                title_height + margin_width * 2 + panel_height,
+            ),  # Bottom-left
+            (
+                margin_width * 2 + panel_width,
+                title_height + margin_width * 2 + panel_height,
+            ),  # Bottom-right
+        ]
+
         for idx, (img, texts) in enumerate(zip(panel_images, panel_texts)):
-            x = (idx % 2) * panel_width
-            y = (idx // 2) * panel_height + title_height
+            if idx >= len(panel_positions):
+                break
+
+            x, y = panel_positions[idx]
+
+            # Draw panel border
+            draw.rectangle(
+                [
+                    x - panel_border_width,
+                    y - panel_border_width,
+                    x + panel_width + panel_border_width,
+                    y + panel_height + panel_border_width,
+                ],
+                fill="black",
+            )
 
             # Paste panel
             canvas.paste(img, (x, y))
 
             # Draw each dialogue line as its own bubble, stacking vertically
-            bubble_y = y + 40
+            bubble_y = y + 20
+            bubble_spacing = 0
+
             for dialogue_line in texts.get("dialogue", []):
-                if dialogue_line:
-                    draw_speech_bubble(
+                if dialogue_line.strip():
+                    bubble_height = draw_speech_bubble(
                         draw,
                         dialogue_line,
-                        x + 20,
-                        bubble_y,
+                        x + 10,
+                        bubble_y + bubble_spacing,
                         font,
-                        max_width=panel_width - 60,
-                        padding=10,
+                        max_width=panel_width - 40,
+                        padding=8,
                     )
-                    bubble_y += 60  # Adjust vertical spacing between bubbles as needed
+                    bubble_spacing += bubble_height + 10
 
-            # Draw caption at bottom
+            # Draw caption at bottom with better styling
             if texts.get("narration"):
                 draw_caption(
                     draw,
                     texts["narration"],
                     x,
-                    y + panel_height,
+                    y + panel_height - 5,
                     panel_width,
                     font,
-                    padding=10,
+                    padding=8,
                 )
 
         # Save stitched image
