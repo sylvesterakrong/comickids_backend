@@ -42,8 +42,8 @@ TEXT_MODEL_NAME = "gemini-2.0-flash"
 # Add placeholder definitions
 NUM_PANELS = 4
 PLACEHOLDER_IMAGE_PATH = os.path.join(settings.MEDIA_ROOT, "placeholder.png")
+PLACEHOLDER_IMAGES = [f"{settings.MEDIA_URL}placeholder.png"] * NUM_PANELS
 PLACEHOLDER_IMAGES = [PLACEHOLDER_IMAGE_PATH] * NUM_PANELS
-
 
 # --- Ensure Placeholder Image Exists ---
 def ensure_placeholder_exists():
@@ -135,7 +135,7 @@ def generate_comic(
             if not title:
                 # Create a fallback title from the prompt
                 title = f"Comic: {prompt[:50]}{'...' if len(prompt) > 50 else ''}"
-            
+
             print(f"Debug: Title extracted: {title}")
 
             # Generate or get placeholder images for all panels
@@ -250,11 +250,11 @@ def extract_title_from_script(script: str) -> str | None:
     try:
         if not script or not script.strip():
             return None
-            
+
         lines = script.split("\n")
         for line in lines:
             line_lower = line.strip().lower()
-            
+
             # Look for learning objective
             if line_lower.startswith("learning objective:"):
                 objective = line.split(":", 1)[1].strip()
@@ -269,9 +269,11 @@ def extract_title_from_script(script: str) -> str | None:
                 else:
                     title = objective
                 return title.strip()
-            
+
             # Alternative patterns to look for
-            elif any(keyword in line_lower for keyword in ["title:", "topic:", "subject:"]):
+            elif any(
+                keyword in line_lower for keyword in ["title:", "topic:", "subject:"]
+            ):
                 if ":" in line:
                     title_part = line.split(":", 1)[1].strip()
                     if title_part and len(title_part) > 3:  # Avoid very short titles
@@ -280,16 +282,21 @@ def extract_title_from_script(script: str) -> str | None:
         # Fallback: look for the first substantial line that might be a title
         for line in lines:
             line = line.strip()
-            if (line and 
-                len(line) > 10 and 
-                not line.lower().startswith(('panel', 'scene', 'dialogue', 'narration')) and
-                not line.startswith(('Panel', 'Scene', 'Dialogue', 'Narration'))):
+            if (
+                line
+                and len(line) > 10
+                and not line.lower().startswith(
+                    ("panel", "scene", "dialogue", "narration")
+                )
+                and not line.startswith(("Panel", "Scene", "Dialogue", "Narration"))
+            ):
                 return line[:50] + ("..." if len(line) > 50 else "")
 
         return None
     except Exception as e:
         print(f"Error extracting title: {e}")
         return None
+
 
 def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
     descriptions = []
@@ -667,16 +674,52 @@ def stitch_panels(
         for url in image_urls:
             print(f"Loading image from: {url}")
             try:
-                response = requests.get(url, stream=True)
-                response.raise_for_status()
-                img = Image.open(BytesIO(response.content)).convert("RGB")
+                # Check if it's a local file path or URL
+                if url.startswith(('http://', 'https://')):
+                    # It's a URL, use requests
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status()
+                    img = Image.open(BytesIO(response.content)).convert("RGB")
+                else:
+                    # It's a local file path
+                    # Convert relative path to absolute path if needed
+                    if not os.path.isabs(url):
+                        # If it's a media URL path, convert to actual file path
+                        if url.startswith(settings.MEDIA_URL):
+                            # Remove the MEDIA_URL prefix and prepend MEDIA_ROOT
+                            relative_path = url.replace(settings.MEDIA_URL, '', 1)
+                            file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+                        else:
+                            # Assume it's relative to MEDIA_ROOT
+                            file_path = os.path.join(settings.MEDIA_ROOT, url)
+                    else:
+                        file_path = url
+                    
+                    # Check if file exists
+                    if not os.path.exists(file_path):
+                        print(f"File not found: {file_path}")
+                        continue
+                    
+                    # Open the local file
+                    img = Image.open(file_path).convert("RGB")
+                
                 panel_images.append(img)
             except Exception as e:
                 print(f"Error loading image {url}: {e}")
-                return None
+                # Continue with other images instead of returning None
+                continue
 
         if not panel_images:
+            print("No images could be loaded")
             return None
+
+        # Ensure we have at least 4 panels (pad with blank if needed)
+        while len(panel_images) < 4:
+            # Create a blank panel
+            blank_panel = Image.new("RGB", (400, 600), "lightgray")
+            draw_blank = ImageDraw.Draw(blank_panel)
+            draw_blank.text((150, 300), "No Image", fill="black")
+            panel_images.append(blank_panel)
 
         # Set dimensions
         panel_width = 400  # Fixed width for each panel
@@ -686,10 +729,10 @@ def stitch_panels(
 
         # Calculate total dimensions with margins
         total_width = (panel_width * 2) + (
-            margin_width * 2
+            margin_width * 3
         )  # 3 margins: left, center, right
         total_height = (
-            (panel_height * 2) + title_height + (margin_width * 2)
+            (panel_height * 2) + title_height + (margin_width * 3)
         )  # 3 margins: top, center, bottom
 
         # Resize all panels to be consistent
@@ -820,73 +863,72 @@ def stitch_panels(
         print(f"Error stitching panels: {e}")
         return None
 
-
 # --- Main execution block for testing utils.py directly ---
-if __name__ == "__main__":
-    if API_KEY_CONFIGURED:
-        print("\n--- Testing Comic Generation Utility Functions ---")
+# if __name__ == "__main__":
+#     if API_KEY_CONFIGURED:
+#         print("\n--- Testing Comic Generation Utility Functions ---")
 
-        # Test with a single prompt
-        test_prompt = (
-            "Teach children about the importance of keeping their environment clean"
-        )
+#         # Test with a single prompt
+#         test_prompt = (
+#             "Teach children about the importance of keeping their environment clean"
+#         )
 
-        comic_script_text, image_urls = generate_comic(
-            prompt=test_prompt,
-        )
+#         comic_script_text, image_urls = generate_comic(
+#             prompt=test_prompt,
+#         )
 
-        if comic_script_text:
-            print("\n--- Generated Script Text ---")
-            print(comic_script_text)
-            print("---------------------------")
+#         if comic_script_text:
+#             print("\n--- Generated Script Text ---")
+#             print(comic_script_text)
+#             print("---------------------------")
 
-            # 2. Test Image Generation
-            print("\n[2] Attempting to generate images based on script...")
-            panel_descriptions = []
-            current_panel_description = ""
+#             # 2. Test Image Generation
+#             print("\n[2] Attempting to generate images based on script...")
+#             panel_descriptions = []
+#             current_panel_description = ""
 
-            for line in comic_script_text.splitlines():
-                if line.startswith("Panel "):
-                    if current_panel_description:
-                        panel_descriptions.append(current_panel_description.strip())
-                    current_panel_description = ""
-                elif line.lower().startswith("scene description:"):
-                    current_panel_description += (
-                        line.replace("Scene Description:", "", 1).strip() + " "
-                    )
-                elif (
-                    current_panel_description
-                    and not line.lower().startswith("dialogue:")
-                    and not line.lower().startswith("narration:")
-                ):
-                    current_panel_description += line.strip() + " "
+#             for line in comic_script_text.splitlines():
+#                 if line.startswith("Panel "):
+#                     if current_panel_description:
+#                         panel_descriptions.append(current_panel_description.strip())
+#                     current_panel_description = ""
+#                 elif line.lower().startswith("scene description:"):
+#                     current_panel_description += (
+#                         line.replace("Scene Description:", "", 1).strip() + " "
+#                     )
+#                 elif (
+#                     current_panel_description
+#                     and not line.lower().startswith("dialogue:")
+#                     and not line.lower().startswith("narration:")
+#                 ):
+#                     current_panel_description += line.strip() + " "
 
-            if current_panel_description:
-                panel_descriptions.append(current_panel_description.strip())
+#             if current_panel_description:
+#                 panel_descriptions.append(current_panel_description.strip())
 
-            if not panel_descriptions:
-                print(
-                    "Could not parse panel descriptions from script for image generation test."
-                )
-            else:
-                for i, desc in enumerate(panel_descriptions):
-                    if not desc:
-                        print(
-                            f"Skipping image generation for Panel {i+1} due to empty description."
-                        )
-                        continue
+#             if not panel_descriptions:
+#                 print(
+#                     "Could not parse panel descriptions from script for image generation test."
+#                 )
+#             else:
+#                 for i, desc in enumerate(panel_descriptions):
+#                     if not desc:
+#                         print(
+#                             f"Skipping image generation for Panel {i+1} due to empty description."
+#                         )
+#                         continue
 
-                    print(
-                        f"\nGenerating image for Panel {i+1} (Description: '{desc[:100]}...')"
-                    )
-                    image_url = generate_panel_image(desc, panel_number=i)
-                    if image_url:
-                        print(f"Panel {i+1} image URL: {image_url}")
-                    else:
-                        print(f"Failed to generate image for Panel {i+1}.")
-        else:
-            print(
-                "Comic script generation failed. Cannot proceed to image generation test."
-            )
-    else:
-        print("Cannot run tests: Gemini API Key is not configured.")
+#                     print(
+#                         f"\nGenerating image for Panel {i+1} (Description: '{desc[:100]}...')"
+#                     )
+#                     image_url = generate_panel_image(desc, panel_number=i)
+#                     if image_url:
+#                         print(f"Panel {i+1} image URL: {image_url}")
+#                     else:
+#                         print(f"Failed to generate image for Panel {i+1}.")
+#         else:
+#             print(
+#                 "Comic script generation failed. Cannot proceed to image generation test."
+#             )
+#     else:
+#         print("Cannot run tests: Gemini API Key is not configured.")
