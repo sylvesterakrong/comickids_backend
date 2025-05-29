@@ -76,7 +76,7 @@ ensure_media_dirs()
 # --- Comic Script Generation ---
 def generate_comic(
     prompt: str,
-) -> tuple[str | None, str | None, list[str] | None]:
+) -> tuple[str | None, str | None, list | None]:
     """
     Generates a comic script and attempts to generate images, falling back to placeholders if needed.
     Returns a tuple of (title, script, image URLs)
