@@ -76,10 +76,10 @@ ensure_media_dirs()
 # --- Comic Script Generation ---
 def generate_comic(
     prompt: str,
-) -> tuple[str | None, str | None, list | None]:
+) -> tuple[str | None, str | None, list[str] | None]:
     """
     Generates a comic script and attempts to generate images, falling back to placeholders if needed.
-    Returns a tuple of (script, list of image URLs)
+    Returns a tuple of (title, script, image URLs)
     """
     if not API_KEY_CONFIGURED:
         print("Error in generate_comic_script: Gemini API Key not configured.")
@@ -667,7 +667,9 @@ def stitch_panels(
         for url in image_urls:
             print(f"Loading image from: {url}")
             try:
-                img = Image.open(url).convert("RGB")
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                img = Image.open(BytesIO(response.content)).convert("RGB")
                 panel_images.append(img)
             except Exception as e:
                 print(f"Error loading image {url}: {e}")
