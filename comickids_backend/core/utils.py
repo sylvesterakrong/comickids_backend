@@ -332,7 +332,6 @@ def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
         descriptions.append("A generic educational comic panel for Ghanaian children.")
     return descriptions[:num_panels]
 
-
 def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
     """
     Extract dialogue (as a list) and narration for each panel, handling bullet lists and markdown.
