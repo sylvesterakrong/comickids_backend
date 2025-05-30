@@ -3,3 +3,4 @@ Pillow
 django
 djangorestframework
 python-decouple
+supabase==2.0.0

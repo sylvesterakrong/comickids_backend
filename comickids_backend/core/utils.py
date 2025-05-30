@@ -4,14 +4,17 @@ import PIL
 import google.generativeai as genai
 from decouple import config, UndefinedValueError
 import os
-import json
+import uuid
 import requests
-import time
 import base64
 from django.conf import settings
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
+from supabase import create_client
+from django.core.files.base import ContentFile
+
+
 
 # --- Configuration ---
 API_KEY_CONFIGURED = False
@@ -44,6 +47,12 @@ NUM_PANELS = 4
 PLACEHOLDER_IMAGE_PATH = os.path.join(settings.MEDIA_ROOT, "placeholder.png")
 PLACEHOLDER_IMAGES = [f"{settings.MEDIA_URL}placeholder.png"] * NUM_PANELS
 PLACEHOLDER_IMAGES = [PLACEHOLDER_IMAGE_PATH] * NUM_PANELS
+
+# Initialize Supabase client
+supabase_client = create_client(
+    settings.SUPABASE_URL,
+    settings.SUPABASE_SERVICE_KEY
+)
 
 # --- Ensure Placeholder Image Exists ---
 def ensure_placeholder_exists():
@@ -196,8 +205,8 @@ def generate_panel_image(
 ) -> str:
     if not STABILITY_API_KEY:
         print("Warning: Using placeholder image (Stability API key not configured)")
-        return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
-
+        # return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
+        return create_and_upload_placeholder(panel_number)
     try:
         prompt = f"{panel_description}. {style_description}"
 
@@ -226,8 +235,8 @@ def generate_panel_image(
             data = response.json()
             if "artifacts" in data and data["artifacts"]:
                 img_b64 = data["artifacts"][0]["base64"]
-                # Save the image and get its URL
-                image_url = save_base64_image(img_b64, panel_number)
+                # Save to Supabase instead of local storage
+                image_url = save_base64_image_to_supabase(img_b64, panel_number)
                 if image_url:
                     return image_url
                 print("Warning: Could not save image")
@@ -239,7 +248,9 @@ def generate_panel_image(
     except Exception as e:
         print(f"Error during image generation: {e}")
 
-    return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
+    # return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
+    return create_and_upload_placeholder(panel_number)
+
 
 
 def extract_title_from_script(script: str) -> str | None:
@@ -515,6 +526,94 @@ def save_image(
         print(f"Error saving image {file_path}: {e}")
         return None
 
+def save_base64_image_to_supabase(b64_string: str, panel_number: int) -> str:
+    """Save a base64 string as an image to Supabase Storage and return its public URL."""
+    try:
+        # Remove the data URL prefix if present
+        if "," in b64_string:
+            b64_string = b64_string.split(",")[1]
+
+        # Generate a unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = uuid.uuid4().hex[:8]
+        filename = f"panel_{panel_number}_{timestamp}_{unique_id}.png"
+
+        # Decode the base64 string
+        image_data = base64.b64decode(b64_string)
+
+       # Upload to Supabase Storage
+        try:
+            result = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                filename,
+                image_data,
+                file_options={"content-type": "image/png"}
+            )
+
+            # Handle different response formats from Supabase
+            if hasattr(result, 'status_code'):
+                if result.status_code == 200:
+                    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
+                    return public_url
+                else:
+                    print(f"Upload failed with status {result.status_code}: {result}")
+                    return None
+            else:
+                # Assume success if no status_code attribute
+                public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
+                return public_url
+
+        except Exception as upload_error:
+            print(f"Supabase upload error: {upload_error}")
+            return None
+
+    except Exception as e:
+        print(f"Error saving image to Supabase: {e}")
+        return None
+    
+def save_pil_image_to_supabase(pil_image, filename_prefix: str) -> str:
+    """Save a PIL Image to Supabase Storage and return its public URL."""
+    try:
+        from io import BytesIO
+        
+        # Convert PIL image to bytes
+        img_buffer = BytesIO()
+        pil_image.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = uuid.uuid4().hex[:8]
+        filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
+        
+        # Upload to Supabase
+        try:
+            result = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                filename,
+                img_buffer.getvalue(),
+                file_options={"content-type": "image/png"}
+            )
+            
+            # Handle response
+            if hasattr(result, 'status_code'):
+                if result.status_code == 200:
+                    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
+                    return public_url
+                else:
+                    print(f"Upload failed with status {result.status_code}: {result}")
+                    return None
+            else:
+                # Assume success
+                public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
+                return public_url
+                
+        except Exception as upload_error:
+            print(f"Error uploading to Supabase: {upload_error}")
+            return None
+            
+    except Exception as e:
+        print(f"Error saving PIL image to Supabase: {e}")
+        return None
+
 
 def extract_panel_dialogues(script: str) -> list[str]:
     dialogues = []
@@ -654,6 +753,42 @@ def wrap_text_for_title(draw, text, font, max_width):
 
     return lines
 
+def create_and_upload_placeholder(panel_number: int) -> str:
+    """Create a placeholder image and upload it to Supabase"""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        
+        # Create placeholder image
+        img = Image.new("RGB", (400, 600), color="lightgray")
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            # Try different font names for cross-platform compatibility
+            font_names = ["arial.ttf", "Arial.ttf", "DejaVuSans.ttf", "liberation-sans.ttf"]
+            font = None
+            for font_name in font_names:
+                try:
+                    font = ImageFont.truetype(font_name, 40)
+                    break
+                except:
+                    continue
+            
+            if font is None:
+                font = ImageFont.load_default()
+        except:
+            font = ImageFont.load_default()
+        
+        draw.text((100, 280), f"Panel {panel_number + 1}", fill="black", font=font)
+        draw.text((120, 320), "No Image", fill="black", font=font)
+        
+        # Upload to Supabase
+        placeholder_url = save_pil_image_to_supabase(img, f"placeholder_panel_{panel_number}")
+        return placeholder_url
+        
+    except Exception as e:
+        print(f"Error creating placeholder: {e}")
+        # Return a fallback URL or None
+        return None
 
 def stitch_panels(
     image_urls: list[str],
@@ -663,7 +798,7 @@ def stitch_panels(
     panel_border_width: int = 3,
 ) -> str:
     """
-    Stitch panels together with title, dialogue bubbles, captions, and black margins for distinction.
+    Stitch panels together with title, dialogue bubbles, captions, and black margins for distinction and upload final comic to Supabase.
     """
     if not image_urls:
         return None
@@ -674,38 +809,39 @@ def stitch_panels(
         for url in image_urls:
             print(f"Loading image from: {url}")
             try:
-                # Check if it's a local file path or URL
                 if url.startswith(('http://', 'https://')):
                     # It's a URL, use requests
-                    response = requests.get(url, stream=True)
+                    response = requests.get(url, stream=True, timeout=30)
                     response.raise_for_status()
                     img = Image.open(BytesIO(response.content)).convert("RGB")
                 else:
                     # It's a local file path
-                    # Convert relative path to absolute path if needed
                     if not os.path.isabs(url):
-                        # If it's a media URL path, convert to actual file path
+                        # Convert relative path to absolute path
                         if url.startswith(settings.MEDIA_URL):
-                            # Remove the MEDIA_URL prefix and prepend MEDIA_ROOT
                             relative_path = url.replace(settings.MEDIA_URL, '', 1)
                             file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
                         else:
-                            # Assume it's relative to MEDIA_ROOT
                             file_path = os.path.join(settings.MEDIA_ROOT, url)
                     else:
                         file_path = url
                     
-                    # Check if file exists
                     if not os.path.exists(file_path):
                         print(f"File not found: {file_path}")
-                        continue
+                        raise FileNotFoundError(f"File not found: {file_path}")
                     
-                    # Open the local file
                     img = Image.open(file_path).convert("RGB")
                 
                 panel_images.append(img)
+                
             except Exception as e:
                 print(f"Error loading image {url}: {e}")
+                # Create a placeholder for failed images
+                placeholder = Image.new("RGB", (400, 600), "lightgray")
+                draw = ImageDraw.Draw(placeholder)
+                draw.text((150, 300), "Image Error", fill="red")
+                panel_images.append(placeholder)
+                
                 # Continue with other images instead of returning None
                 continue
 
@@ -858,77 +994,23 @@ def stitch_panels(
         file_path = os.path.join(output_dir, filename)
         canvas.save(file_path)
 
+        # Upload final stitched image to Supabase
+        final_comic_url = save_pil_image_to_supabase(canvas, "stitched_comic")
+        return final_comic_url
+    
         return f"{settings.MEDIA_URL}generated_images/{filename}"
     except Exception as e:
         print(f"Error stitching panels: {e}")
         return None
 
-# --- Main execution block for testing utils.py directly ---
-# if __name__ == "__main__":
-#     if API_KEY_CONFIGURED:
-#         print("\n--- Testing Comic Generation Utility Functions ---")
-
-#         # Test with a single prompt
-#         test_prompt = (
-#             "Teach children about the importance of keeping their environment clean"
-#         )
-
-#         comic_script_text, image_urls = generate_comic(
-#             prompt=test_prompt,
-#         )
-
-#         if comic_script_text:
-#             print("\n--- Generated Script Text ---")
-#             print(comic_script_text)
-#             print("---------------------------")
-
-#             # 2. Test Image Generation
-#             print("\n[2] Attempting to generate images based on script...")
-#             panel_descriptions = []
-#             current_panel_description = ""
-
-#             for line in comic_script_text.splitlines():
-#                 if line.startswith("Panel "):
-#                     if current_panel_description:
-#                         panel_descriptions.append(current_panel_description.strip())
-#                     current_panel_description = ""
-#                 elif line.lower().startswith("scene description:"):
-#                     current_panel_description += (
-#                         line.replace("Scene Description:", "", 1).strip() + " "
-#                     )
-#                 elif (
-#                     current_panel_description
-#                     and not line.lower().startswith("dialogue:")
-#                     and not line.lower().startswith("narration:")
-#                 ):
-#                     current_panel_description += line.strip() + " "
-
-#             if current_panel_description:
-#                 panel_descriptions.append(current_panel_description.strip())
-
-#             if not panel_descriptions:
-#                 print(
-#                     "Could not parse panel descriptions from script for image generation test."
-#                 )
-#             else:
-#                 for i, desc in enumerate(panel_descriptions):
-#                     if not desc:
-#                         print(
-#                             f"Skipping image generation for Panel {i+1} due to empty description."
-#                         )
-#                         continue
-
-#                     print(
-#                         f"\nGenerating image for Panel {i+1} (Description: '{desc[:100]}...')"
-#                     )
-#                     image_url = generate_panel_image(desc, panel_number=i)
-#                     if image_url:
-#                         print(f"Panel {i+1} image URL: {image_url}")
-#                     else:
-#                         print(f"Failed to generate image for Panel {i+1}.")
-#         else:
-#             print(
-#                 "Comic script generation failed. Cannot proceed to image generation test."
-#             )
-#     else:
-#         print("Cannot run tests: Gemini API Key is not configured.")
+def test_supabase_connection():
+    try:
+        result = supabase_client.storage.list_buckets()
+        print("Supabase connection successful:", result)
+        return True
+    except Exception as e:
+        print("Supabase connection failed:", e)
+        return False
+    
+if __name__ == "__main__":
+    test_supabase_connection()

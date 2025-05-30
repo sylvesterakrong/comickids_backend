@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -147,8 +148,24 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
 
+
+# Supabase configuration
+SUPABASE_URL = config('SUPABASE_URL', default='')
+SUPABASE_ANON_KEY = config('SUPABASE_ANON_KEY', default='')
+SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_KEY', default='')
+SUPABASE_STORAGE_BUCKET = config('SUPABASE_STORAGE_BUCKET', default='comic-images')
+
+
+# Media files configuration for production
+IS_PRODUCTION = config('ENVIRONMENT', default='development').lower() == 'production'
+
+if IS_PRODUCTION and SUPABASE_URL:
+    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabaseStorage'
+    MEDIA_URL = f'{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/'
+else:
+    
 # Media files configuration
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-GENERATED_IMAGES_DIR = os.path.join(MEDIA_ROOT, 'generated_images')
-os.makedirs(GENERATED_IMAGES_DIR, exist_ok=True)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    GENERATED_IMAGES_DIR = os.path.join(MEDIA_ROOT, 'generated_images')
+    os.makedirs(GENERATED_IMAGES_DIR, exist_ok=True)
