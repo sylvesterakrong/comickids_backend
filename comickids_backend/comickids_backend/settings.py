@@ -137,7 +137,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "https://comickids-ai.vercel.app/",
-    "https://comickids-backend-server.onrender.com/admin/"                 
+    "https://comickids-backend-server.onrender.com/",               
     ]
 
 
