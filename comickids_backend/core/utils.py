@@ -98,38 +98,45 @@ def generate_comic(
 
     # --- Prompt Engineering for Script Generation ---
     enhanced_prompt = f"""
-    You are an expert creator of educational comic strips for Ghanaian primary school students.
-    Your task is to generate a script for a {NUM_PANELS}-panel comic  script with the following EXACT format:
+    You are an expert educational comic strip writer for Ghanaian primary school students.
+
+    Your task is to generate a script for a {NUM_PANELS}-panel educational comic. Follow the EXACT structure below:
 
     Learning Objective: {prompt}
-    Mandatory Ghanaian Cultural Elements to be included to give it a natural feel
-    
-    Panel 1
-    Scene Description: [Detailed visual elements, setting, character appearances (simple, relatable Ghanaian characters), character actions, and expressions. Incorporate the cultural elements here.]
-    Dialogue: [Character dialogue, one line per character. Keep it simple and clear, using language appropriate for primary school students. Use Ghanaian names and phrases where relevant.]
-    Narration: [ Text that explains the scene or reinforces the learning objective (if any).]
 
-    Panel 2
-    Scene Description: [Detailed visual elements, setting, character appearances (simple, relatable Ghanaian characters), character actions, and expressions. Incorporate the cultural elements here.]
-    Dialogue: [Character dialogue, one line per character. Keep it simple and clear, using language appropriate for primary school students. Use Ghanaian names and phrases where relevant.]
-    Narration: [ Text that explains the scene or reinforces the learning objective (if any).]
+    Cultural Guidelines:
+    - The story must reflect Ghanaian cultural values and moral customs.
+    - All characters should be simple, relatable Ghanaian children or elders with Ghanaian names.
+    - Clothing should be modest and culturally appropriate (e.g., kaba and slit, fugu, school uniforms).
+    - Settings should reflect familiar Ghanaian environments (e.g., village, school compound, market, farm).
+    - **Do not include any symbols, themes, or elements that go against traditional Ghanaian values** (e.g., LGBTQ+ themes, Western holidays, or modern urban culture not common in rural Ghana).
+    - Use Akan, Ewe, or other Ghanaian terms where suitable, but explain them clearly or show context.
+    - The story should be age-appropriate and avoid any sensitive or controversial material.
 
-    [Continue for all {NUM_PANELS} panels]
+    Comic Script Format:
 
-    The story should be engaging, easy to understand for a primary school student, directly teach or illustrate the learning objective, and be culturally sensitive and relevant to Ghana. It should also be grammatically correct.
-    Output the script as a clear, well-structured text. 
-    
-    Make sure each panel has content for dialogue and narration sections.
-    
-    Requirements:
-    - Each panel MUST have content for all three sections (Scene Description, Dialogue, Narration)
-    - Use simple, clear language appropriate for primary school students
-    - Include Ghanaian cultural elements naturally
-    - Make the story engaging and educational
-    - Ensure the dialogue progresses the story logically
-    - Make sure the narration reinforces the learning objective
+    Panel 1  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally.]  
+    Dialogue: [Character dialogue, one line per character. Use simple and clear language for primary school students.]  
+    Narration: [Short caption to explain or support the learning objective.]
 
+    Panel 2  
+    Scene Description: [Detailed and vivid illustration description.]  
+    Dialogue: [Character lines, culturally natural and child-friendly.]  
+    Narration: [Supporting text.]
+
+    [Repeat for {NUM_PANELS} panels]
+
+    Final Requirements:
+    - Each panel MUST include content for all three sections: Scene Description, Dialogue, Narration.
+    - Use simple but **grammatically correct** English.
+    - Dialogue must progress the story clearly and logically.
+    - Narration should reinforce the learning objective in each panel.
+    - The script must be culturally sensitive and educationally effective.
+
+    Output a clearly structured, printable script for the comic.
     """
+
 
     try:
         model = genai.GenerativeModel(TEXT_MODEL_NAME)
@@ -233,24 +240,39 @@ def generate_panel_image(
 
         if response.status_code == 200:
             data = response.json()
+            print("Debug - Response keys:", list(data.keys()))  # See what keys exist
+            
+            # Try different possible response structures
+            img_b64 = None
+            
+            # Option 1: artifacts (old format)
             if "artifacts" in data and data["artifacts"]:
                 img_b64 = data["artifacts"][0]["base64"]
-                # Save to Supabase instead of local storage
+            # Option 2: image (new format)
+            elif "image" in data:
+                img_b64 = data["image"]
+            # Option 3: data field
+            elif "data" in data and isinstance(data["data"], list) and data["data"]:
+                img_b64 = data["data"][0].get("base64")
+            # Option 4: direct base64 field
+            elif "base64" in data:
+                img_b64 = data["base64"]
+            
+            if img_b64:
                 image_url = save_base64_image_to_supabase(img_b64, panel_number)
                 if image_url:
                     return image_url
                 print("Warning: Could not save image")
             else:
-                print("Warning: No artifacts in response")
+                print("Warning: No image data found in response")
+                print("Debug - Full response:", data)
         else:
             print(f"Stability AI error: {response.status_code} {response.text}")
 
     except Exception as e:
         print(f"Error during image generation: {e}")
 
-    # return PLACEHOLDER_IMAGES[panel_number % len(PLACEHOLDER_IMAGES)]
     return create_and_upload_placeholder(panel_number)
-
 
 
 def extract_title_from_script(script: str) -> str | None:
@@ -307,7 +329,6 @@ def extract_title_from_script(script: str) -> str | None:
     except Exception as e:
         print(f"Error extracting title: {e}")
         return None
-
 
 def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
     descriptions = []
@@ -431,7 +452,6 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
 
     # Truncate if we have too many panels
     return panels[:num_panels]
-
 
 def extract_panel_texts_robust(script: str, num_panels=4) -> list[dict]:
     """
