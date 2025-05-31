@@ -254,7 +254,6 @@ def generate_panel_image(
             "samples": (None, "1"),
             "cfg_scale": (None, "7"),
             "scheduler": "euler_a", 
-            "output_format": "jpeg",
         }
 
         response = requests.post(
