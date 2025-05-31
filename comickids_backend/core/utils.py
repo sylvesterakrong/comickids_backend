@@ -312,8 +312,8 @@ def generate_panel_image(
 
 def extract_title_from_script(script: str) -> str | None:
     """
-    Extract a meaningful title from the comic script.
-    Looks for the Learning Objective line and creates a short title from it.
+    Extracts a meaningful title from the Gemini-generated script,
+    preferring explicit 'Title:', 'Topic:' lines over fallback logic.
     """
     try:
         if not script or not script.strip():
@@ -323,43 +323,40 @@ def extract_title_from_script(script: str) -> str | None:
         for line in lines:
             line_lower = line.strip().lower()
 
-            # Look for learning objective
+            # First preference: actual title
+            if line_lower.startswith("title:"):
+                title = line.split(":", 1)[1].strip()
+                if title:
+                    return title[:50] + ("..." if len(title) > 50 else "")
+
+        # Second: topic/subject
+        for line in lines:
+            line_lower = line.strip().lower()
+            if any(keyword in line_lower for keyword in ["topic:", "subject:"]):
+                if ":" in line:
+                    title = line.split(":", 1)[1].strip()
+                    if title:
+                        return title[:50] + ("..." if len(title) > 50 else "")
+
+        # Third: learning objective
+        for line in lines:
+            line_lower = line.strip().lower()
             if line_lower.startswith("learning objective:"):
                 objective = line.split(":", 1)[1].strip()
-                # Create a shorter, more title-like version
-                if len(objective) > 50:
-                    # Take first part or create a summary
-                    words = objective.split()
-                    if len(words) > 8:
-                        title = " ".join(words[:8]) + "..."
-                    else:
-                        title = objective
-                else:
-                    title = objective
-                return title.strip()
+                words = objective.split()
+                if len(words) > 8:
+                    return " ".join(words[:8]) + "..."
+                return objective
 
-            # Alternative patterns to look for
-            elif any(
-                keyword in line_lower for keyword in ["title:", "topic:", "subject:"]
-            ):
-                if ":" in line:
-                    title_part = line.split(":", 1)[1].strip()
-                    if title_part and len(title_part) > 3:  # Avoid very short titles
-                        return title_part[:50] + ("..." if len(title_part) > 50 else "")
-
-        # Fallback: look for the first substantial line that might be a title
+        # Fallback: any decent first line
         for line in lines:
             line = line.strip()
             if (
                 line
                 and len(line) > 10
-                and not line.lower().startswith(
-                    ("panel", "scene", "dialogue", "narration")
-                )
-                and not line.startswith(("Panel", "Scene", "Dialogue", "Narration"))
+                and not line.lower().startswith(("panel", "scene", "dialogue", "narration"))
             ):
                 return line[:50] + ("..." if len(line) > 50 else "")
-
         return None
     except Exception as e:
         print(f"Error extracting title: {e}")
@@ -706,7 +703,6 @@ def wrap_text(draw, text, font, max_width):
     if current_line:
         lines.append(" ".join(current_line))
     return lines
-
 
 def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner_radius=20, tail_side='left'):
     """Draws a traditional comic-style speech bubble and returns total height used."""
