@@ -34,10 +34,10 @@ SECRET_KEY = os.getenv(
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "http://127.0.0.1:8000",
-    # "https://comickids-ai.vercel.app/",
-    "https://comickids-backend-server.onrender.com/",               
-    ]
+    "127.0.0.1",
+    "localhost",
+    "comickids-backend-server.onrender.com",               
+]
 
 
 
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -63,7 +64,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = "comickids_backend.urls"
@@ -139,12 +139,40 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://comickids-ai.vercel.app",
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
-    "https://comickids-ai.vercel.app/",
-    "https://comickids-backend-server.onrender.com/",               
-    ]
-
+    "http://localhost:8000",
+    "https://comickids-ai.vercel.app",
+    "https://comickids-backend-server.onrender.com",               
+]
 
 # Serve static files (during development)
 STATIC_URL = "/static/"
