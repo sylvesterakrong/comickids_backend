@@ -62,33 +62,33 @@ class GenerateComicView(APIView):
         # Generate script and panel images with error handling
         try:
             # ADD TIMING DEBUG
-            print("Debug: Calling generate_comic function...")
+            # print("Debug: Calling generate_comic function...")
             comic_start_time = time.time()
             
             result = generate_comic(prompt)
             
             comic_generation_time = time.time() - comic_start_time
-            print(f"Debug: generate_comic completed in {comic_generation_time:.2f} seconds")
+            # print(f"Debug: generate_comic completed in {comic_generation_time:.2f} seconds")
             
             # Debug: Print the actual result structure
-            print(f"Generate comic result type: {type(result)}")
-            print(f"Generate comic result length: {len(result) if isinstance(result, tuple) else 'Not a tuple'}")
+            # print(f"Generate comic result type: {type(result)}")
+            # print(f"Generate comic result length: {len(result) if isinstance(result, tuple) else 'Not a tuple'}")
             
             # Handle the 3-value return: title, script, image_urls
             if isinstance(result, tuple) and len(result) == 3:
                 title, script_text, image_urls = result
-                print(f"Extracted - Title: {title}")
-                print(f"Script length: {len(script_text) if script_text else 0}")
-                print(f"Number of images: {len(image_urls) if image_urls else 0}")
+                # print(f"Extracted - Title: {title}")
+                # print(f"Script length: {len(script_text) if script_text else 0}")
+                # print(f"Number of images: {len(image_urls) if image_urls else 0}")
             else:
-                print(f"Unexpected result format from generate_comic: {result}")
+                # print(f"Unexpected result format from generate_comic: {result}")
                 return Response(
                     {"error": "Invalid comic generation result format"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
         except Exception as e:
-            print(f"Error generating comic: {e}")
+            # print(f"Error generating comic: {e}")
             return Response(
                 {"error": f"Failed to generate comic: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -110,27 +110,27 @@ class GenerateComicView(APIView):
             )
 
         # Debug: Print the full script for analysis
-        print("=== GENERATED SCRIPT ===")
-        print(f"Title: {title}")
-        print(f"Script: {script_text[:200]}...")  # Print first 200 chars
-        print("========================")
+        # print("=== GENERATED SCRIPT ===")
+        # print(f"Title: {title}")
+        # print(f"Script: {script_text[:200]}...")  # Print first 200 chars
+        # print("========================")
 
         # Extract panel texts with debugging
         try:
             panel_extraction_start = time.time()
             panel_texts = extract_panel_texts(script_text)
-            print("Extracted Panel Texts:", panel_texts)
-            print(f"Debug: Panel extraction took {time.time() - panel_extraction_start:.2f} seconds")
+            # print("Extracted Panel Texts:", panel_texts)
+            # print(f"Debug: Panel extraction took {time.time() - panel_extraction_start:.2f} seconds")
             
             # Additional debugging: count non-empty panels
             non_empty_panels = sum(1 for panel in panel_texts if panel.get('dialogue') or panel.get('narration'))
-            print(f"Non-empty panels found: {non_empty_panels} out of {len(panel_texts)}")
+            # print(f"Non-empty panels found: {non_empty_panels} out of {len(panel_texts)}")
             
             # If most panels are empty, try the robust extraction method
             if non_empty_panels < len(panel_texts) / 2:
-                print("Trying robust extraction method...")
+                # print("Trying robust extraction method...")
                 panel_texts = extract_panel_texts_robust(script_text)
-                print("Robust extraction result:", panel_texts)
+                # print("Robust extraction result:", panel_texts)
         
         except Exception as e:
             print(f"Error extracting panel texts: {e}")
@@ -143,12 +143,12 @@ class GenerateComicView(APIView):
         try:
             # Use the extracted title for the comic
             stitch_start_time = time.time()
-            print("Debug: Starting panel stitching...")
+            # print("Debug: Starting panel stitching...")
             
             stitched_url = stitch_panels(image_urls, panel_texts, title=title)
             
             stitch_time = time.time() - stitch_start_time
-            print(f"Debug: Panel stitching took {stitch_time:.2f} seconds")
+            # print(f"Debug: Panel stitching took {stitch_time:.2f} seconds")
             
         except Exception as e:
             print(f"Error stitching panels: {e}")
@@ -184,7 +184,7 @@ class GenerateComicView(APIView):
         gc.collect()
         
         total_time = time.time() - start_time
-        print(f"Debug: TOTAL comic generation time: {total_time:.2f} seconds")
+        # print(f"Debug: TOTAL comic generation time: {total_time:.2f} seconds")
 
         return Response(
             {
