@@ -708,8 +708,8 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-def draw_speech_bubble(draw, text, x, y, font, max_width=300, padding=10):
-    """Enhanced speech bubble with better styling and returns height."""
+def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner_radius=20, tail_side='left'):
+    """Draws a traditional comic-style speech bubble and returns total height used."""
     if not text:
         return 0
 
@@ -719,50 +719,51 @@ def draw_speech_bubble(draw, text, x, y, font, max_width=300, padding=10):
 
     # Calculate bubble dimensions
     line_height = font.getbbox("A")[3] - font.getbbox("A")[1]
-    bubble_width = max([draw.textlength(line, font=font) for line in lines]) + (
-        padding * 2
-    )
-    bubble_height = len(lines) * line_height + (len(lines) - 1) * 3 + (padding * 2)
+    bubble_width = max([draw.textlength(line, font=font) for line in lines]) + padding * 2
+    bubble_height = len(lines) * (line_height + 4) + padding * 2
 
-    # Draw bubble background with shadow
-    shadow_offset = 2
-    # Shadow
-    draw.ellipse(
-        [
-            x + shadow_offset,
-            y + shadow_offset,
-            x + bubble_width + shadow_offset,
-            y + bubble_height + shadow_offset,
-        ],
-        fill="gray",
-    )
+    # Bubble rectangle position
+    rect_x0, rect_y0 = x, y
+    rect_x1, rect_y1 = x + bubble_width, y + bubble_height
 
-    # Main bubble
-    draw.ellipse(
-        [x, y, x + bubble_width, y + bubble_height],
+    # Tail dimensions
+    tail_height = 20
+    tail_width = 25
+
+    # Draw bubble (rounded rectangle)
+    draw.rounded_rectangle(
+        [rect_x0, rect_y0, rect_x1, rect_y1],
+        radius=corner_radius,
         fill="white",
         outline="black",
-        width=2,
+        width=2
     )
 
-    # Draw tail
-    tail_size = 15
-    tail_points = [
-        (x + 30, y + bubble_height),
-        (x + 20, y + bubble_height + tail_size),
-        (x + 45, y + bubble_height),
-    ]
-    draw.polygon(tail_points, fill="white", outline="black", width=2)
+    # Draw tail (triangle)
+    if tail_side == 'left':
+        tail_base_x = rect_x0 + 30
+    elif tail_side == 'right':
+        tail_base_x = rect_x1 - 30
+    else:
+        tail_base_x = (rect_x0 + rect_x1) // 2
 
-    # Draw text
-    current_y = y + padding
+    tail_points = [
+        (tail_base_x, rect_y1),                         # Bottom center of bubble
+        (tail_base_x - tail_width // 2, rect_y1 + tail_height),
+        (tail_base_x + tail_width // 2, rect_y1 + tail_height),
+    ]
+    draw.polygon(tail_points, fill="white", outline="black")
+
+    # Draw text inside the bubble
+    current_y = rect_y0 + padding
     for line in lines:
         text_width = draw.textlength(line, font=font)
-        text_x = x + (bubble_width - text_width) // 2
+        text_x = rect_x0 + (bubble_width - text_width) // 2
         draw.text((text_x, current_y), line, fill="black", font=font)
-        current_y += line_height + 3
+        current_y += line_height + 4
 
-    return bubble_height + tail_size
+    return bubble_height + tail_height
+
 
 
 def draw_caption(draw, text, x, y, width, font, padding=10):
