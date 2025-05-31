@@ -12,8 +12,9 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from supabase import create_client
-from django.core.files.base import ContentFile
-
+import gc
+import time
+import requests
 
 
 # --- Configuration ---
@@ -81,6 +82,11 @@ def ensure_media_dirs():
 
 ensure_media_dirs()
 
+def cleanup_memory():
+    """Force garbage collection to free memory"""
+    gc.collect()
+    print("Debug: Memory cleanup performed")
+
 
 # --- Comic Script Generation ---
 def generate_comic(
@@ -139,8 +145,14 @@ def generate_comic(
 
 
     try:
+        script_start_time = time.time()
+        print("Debug: Starting script generation...")
+
         model = genai.GenerativeModel(TEXT_MODEL_NAME)
         response = model.generate_content(enhanced_prompt)
+
+        script_time = time.time() - script_start_time
+        print(f"Debug: Script generation took {script_time:.2f} seconds")
 
         if response.text:
             comic_script = response.text
@@ -151,30 +163,46 @@ def generate_comic(
             if not title:
                 # Create a fallback title from the prompt
                 title = f"Comic: {prompt[:50]}{'...' if len(prompt) > 50 else ''}"
-
             print(f"Debug: Title extracted: {title}")
 
-            # Generate or get placeholder images for all panels
+            # Extract panel descriptions
+            panel_extraction_start = time.time()
             panel_descriptions = extract_panel_descriptions(comic_script, NUM_PANELS)
             print(f"Debug: Extracted {len(panel_descriptions)} panel descriptions")
+            print(f"Debug: Panel extraction took {time.time() - panel_extraction_start:.2f} seconds")
 
+            # Generate or get placeholder images for all panels
+            images_start_time = time.time()
             image_urls = []
             for i, desc in enumerate(panel_descriptions):
                 print(f"Debug: Generating image for panel {i+1}")
-                image_url = generate_panel_image(panel_description=desc, panel_number=i)
-                image_urls.append(image_url)
+                try:
+                    image_url = generate_panel_image(panel_description=desc, panel_number=i)
+                    image_urls.append(image_url)
+                    time.sleep(0.5)  # Optional: prevent rate limits
+                except Exception as e:
+                    print(f"Warning: Failed to generate image for panel {i+1}: {e}")
+                    image_urls.append(None)
 
-            if not image_urls:
+            images_time = time.time() - images_start_time
+            print(f"Debug: All image generation took {images_time:.2f} seconds")
+
+            if not image_urls or all(url is None for url in image_urls):
                 print("Debug: No image URLs generated, using placeholders")
                 image_urls = PLACEHOLDER_IMAGES[:NUM_PANELS]
+
+            # Final cleanup
+            gc.collect()
 
             return title, comic_script, image_urls
         else:
             print("Script generation failed: No text returned.")
             return None, None, None
+
     except Exception as e:
         print(f"Error during comic script generation: {e}")
         return None, None, None
+
 
 
 # --- Panel Image Generation ---
@@ -216,14 +244,17 @@ def generate_panel_image(
         return create_and_upload_placeholder(panel_number)
     try:
         prompt = f"{panel_description}. {style_description}"
-
+        panel_start_time = time.time()
+        
         files = {
             "prompt": (None, prompt),
-            "steps": (None, "30"),
-            "width": (None, "1024"),
-            "height": (None, "1024"),
+            "steps": (None, "15"),
+            "width": (None, "512"),
+            "height": (None, "512"),
             "samples": (None, "1"),
             "cfg_scale": (None, "7"),
+            "scheduler": "euler_a", 
+            "output_format": "jpeg",
         }
 
         response = requests.post(
@@ -233,8 +264,11 @@ def generate_panel_image(
                 "Accept": "application/json",
             },
             files=files,
-            timeout=60,
+            timeout=45,
         )
+        
+        
+        panel_time = time.time() - panel_start_time
 
         print(f"Debug - Response Status: {response.status_code}")
 
@@ -242,6 +276,8 @@ def generate_panel_image(
             data = response.json()
             print("Debug - Response keys:", list(data.keys()))  # See what keys exist
             
+            # IMMEDIATE MEMORY CLEANUP
+            gc.collect()
             # Try different possible response structures
             img_b64 = None
             
@@ -1022,14 +1058,3 @@ def stitch_panels(
         print(f"Error stitching panels: {e}")
         return None
 
-def test_supabase_connection():
-    try:
-        result = supabase_client.storage.list_buckets()
-        print("Supabase connection successful:", result)
-        return True
-    except Exception as e:
-        print("Supabase connection failed:", e)
-        return False
-    
-if __name__ == "__main__":
-    test_supabase_connection()
