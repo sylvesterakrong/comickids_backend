@@ -93,8 +93,8 @@
     </style>
   </head>
   <body>
-    <h1>Educational Comic Generator</h1>
-    {% csrf_token %}
+    <h1>The server is up and running: 200</h1>
+    {% comment %} {% csrf_token %}
 
     <div class="form-group">
       <label for="prompt">Learning Objective:</label>
@@ -189,6 +189,6 @@
                 </div>`;
         }
       }
-    </script>
+    </script> {% endcomment %}
   </body>
 </html>

@@ -36,7 +36,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
-    "comickids-backend-server.onrender.com",               
+    "comickids-backend-server.onrender.com",
+    "localhost:8080"               
 ]
 
 
@@ -144,6 +145,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
     "https://comickids-ai.vercel.app",
+    "http://localhost:8080"
 ]
 
 CORS_ALLOW_HEADERS = [
