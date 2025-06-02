@@ -725,7 +725,7 @@ def draw_speech_bubble(
     tail_side="left",
     opacity=190
 ):
-    """Draws a traditional comic-style speech bubble and returns total height used."""
+    """Draws a traditional comic-style speech bubble with opacity and returns total height used."""
     if not text:
         return 0
 
@@ -733,28 +733,33 @@ def draw_speech_bubble(
     if not lines:
         return 0
 
-    # Calculate dimensions (unchanged)
+    # Calculate dimensions
     line_height = font.getbbox("A")[3] - font.getbbox("A")[1]
     bubble_width = (
         max([draw.textlength(line, font=font) for line in lines]) + padding * 2
     )
     bubble_height = len(lines) * (line_height + 4) + padding * 2
 
+    # Ensure the main image is in RGBA mode for alpha compositing
+    main_image = draw.image
+    if main_image.mode != 'RGBA':
+        # Convert to RGBA temporarily
+        main_image_rgba = main_image.convert('RGBA')
+    else:
+        main_image_rgba = main_image
+
     # Create a transparent bubble overlay
-    bubble_overlay = Image.new('RGBA', (int(bubble_width), int(bubble_height)), (255, 255, 255, 0))
+    bubble_overlay = Image.new('RGBA', main_image_rgba.size, (255, 255, 255, 0))
     bubble_draw = ImageDraw.Draw(bubble_overlay)
 
-    # Draw the bubble on the overlay
+    # Draw the main bubble
     bubble_draw.rounded_rectangle(
-        [0, 0, bubble_width-1, bubble_height-1],
+        [x, y, x + bubble_width-1, y + bubble_height-1],
         radius=corner_radius,
         fill=(255, 255, 255, opacity),  # White with transparency
         outline=(0, 0, 0, 255),         # Solid black outline
         width=2
     )
-
-# Paste the semi-transparent bubble
-    draw.image.paste(bubble_overlay, (x, y), bubble_overlay)
 
     # Draw tail (triangle) with transparency
     tail_height = 20
@@ -766,25 +771,37 @@ def draw_speech_bubble(
     else:
         tail_base_x = x + bubble_width // 2
 
-    # Create transparent tail
     tail_points = [
         (tail_base_x, y + bubble_height),
         (tail_base_x - tail_width // 2, y + bubble_height + tail_height),
         (tail_base_x + tail_width // 2, y + bubble_height + tail_height),
     ]
     
-    # Draw tail with transparency
-    tail_overlay = Image.new('RGBA', draw.image.size, (255, 255, 255, 0))
-    tail_draw = ImageDraw.Draw(tail_overlay)
-    tail_draw.polygon(tail_points, fill=(255, 255, 255, opacity), outline=(0, 0, 0, 255))
-    draw.image.alpha_composite(tail_overlay)
+    # Draw tail on the same overlay
+    bubble_draw.polygon(tail_points, fill=(255, 255, 255, opacity), outline=(0, 0, 0, 255))
 
-    # Draw text (solid black)
+    # Alpha composite the bubble onto the main image
+    main_image_rgba = Image.alpha_composite(main_image_rgba, bubble_overlay)
+    
+    # Convert back to RGB if the original was RGB
+    if main_image.mode != 'RGBA':
+        main_image_rgb = main_image_rgba.convert('RGB')
+        # Replace the original image data
+        main_image.paste(main_image_rgb, (0, 0))
+        # Update the draw object to work with the updated image
+        draw.image = main_image
+    else:
+        draw.image = main_image_rgba
+
+    # Create a new draw object for text (to ensure it works with the updated image)
+    text_draw = ImageDraw.Draw(draw.image)
+    
+    # Draw text (solid black) on the updated image
     current_y = y + padding
     for line in lines:
-        text_width = draw.textlength(line, font=font)
+        text_width = text_draw.textlength(line, font=font)
         text_x = x + (bubble_width - text_width) // 2
-        draw.text((text_x, current_y), line, fill="black", font=font)
+        text_draw.text((text_x, current_y), line, fill="black", font=font)
         current_y += line_height + 4
 
     return bubble_height + tail_height
