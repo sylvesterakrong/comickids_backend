@@ -3,5 +3,7 @@ media/generated_images/*
 staticfiles/
 *.pyc
 __pycache__/
-.env/
+.env
+*.env
+.env.*
 *.sqlite3
