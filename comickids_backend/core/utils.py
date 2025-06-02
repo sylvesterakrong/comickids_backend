@@ -117,17 +117,18 @@ def generate_comic(
     - **Do not include any symbols, themes, or elements that go against traditional Ghanaian values** (e.g., LGBTQ+ themes, Western holidays, or modern urban culture not common in rural Ghana).
     - Use Akan, Ewe, or other Ghanaian terms where suitable, but explain them clearly or show context.
     - The story should be age-appropriate and avoid any sensitive or controversial material.
+    -Characters and scenes should be 2D cartoonish and not realistic with the same design style throughout the comic.
 
     Comic Script Format:
 
     Panel 1  
-    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be cartoonish and not too realistic with the same design style throughout the comic.]  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. The panels should be cartoonish]  
     Dialogue: [Use simple and clear language for primary school students.]  
     Narration: [Short caption to explain or support the learning objective.]
 
     Panel 2  
-    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be cartoonish and not too realistic with the same design style throughout the comic.]  
-    Dialogue: [ Use simple and clear language for primary school students.]  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. The panels should be cartoonish]  
+    Dialogue: [Use simple and clear language for primary school students.]  
     Narration: [Short caption to explain or support the learning objective.]
 
     [Repeat for {NUM_PANELS} panels]
@@ -962,7 +963,7 @@ def stitch_panels(
         panel_images = [img.resize((panel_width, panel_height)) for img in panel_images]
 
         # Create canvas with black background for margins
-        canvas = Image.new("RGBA", (total_width, total_height), (0, 0, 0, 255))
+        canvas = Image.new("RGB", (total_width, total_height), "black")
         draw = ImageDraw.Draw(canvas)
 
         # Load fonts
