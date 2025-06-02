@@ -121,12 +121,12 @@ def generate_comic(
     Comic Script Format:
 
     Panel 1  
-    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be 2D cartoonish and not too realistic with the same design style throughout the comic.]  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be cartoonish and not too realistic with the same design style throughout the comic.]  
     Dialogue: [Use simple and clear language for primary school students.]  
     Narration: [Short caption to explain or support the learning objective.]
 
     Panel 2  
-    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be 2D cartoonish and not too realistic with the same design style throughout the comic.]  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be cartoonish and not too realistic with the same design style throughout the comic.]  
     Dialogue: [ Use simple and clear language for primary school students.]  
     Narration: [Short caption to explain or support the learning objective.]
 
