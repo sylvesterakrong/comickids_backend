@@ -99,7 +99,7 @@ comickids_backend/
 └── manage.py
 
 ```python
-
+```
 ## ⚠️ Important Notes
 
 - Add `.env` and `media/` to your `.gitignore`
@@ -111,7 +111,7 @@ comickids_backend/
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgements
 
