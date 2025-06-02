@@ -50,10 +50,8 @@ PLACEHOLDER_IMAGES = [f"{settings.MEDIA_URL}placeholder.png"] * NUM_PANELS
 PLACEHOLDER_IMAGES = [PLACEHOLDER_IMAGE_PATH] * NUM_PANELS
 
 # Initialize Supabase client
-supabase_client = create_client(
-    settings.SUPABASE_URL,
-    settings.SUPABASE_SERVICE_KEY
-)
+supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
 
 # --- Ensure Placeholder Image Exists ---
 def ensure_placeholder_exists():
@@ -81,6 +79,7 @@ def ensure_media_dirs():
 
 
 ensure_media_dirs()
+
 
 def cleanup_memory():
     """Force garbage collection to free memory"""
@@ -143,7 +142,6 @@ def generate_comic(
     Output a clearly structured, printable script for the comic.
     """
 
-
     try:
         script_start_time = time.time()
         print("Debug: Starting script generation...")
@@ -169,7 +167,9 @@ def generate_comic(
             panel_extraction_start = time.time()
             panel_descriptions = extract_panel_descriptions(comic_script, NUM_PANELS)
             print(f"Debug: Extracted {len(panel_descriptions)} panel descriptions")
-            print(f"Debug: Panel extraction took {time.time() - panel_extraction_start:.2f} seconds")
+            print(
+                f"Debug: Panel extraction took {time.time() - panel_extraction_start:.2f} seconds"
+            )
 
             # Generate or get placeholder images for all panels
             images_start_time = time.time()
@@ -177,7 +177,9 @@ def generate_comic(
             for i, desc in enumerate(panel_descriptions):
                 print(f"Debug: Generating image for panel {i+1}")
                 try:
-                    image_url = generate_panel_image(panel_description=desc, panel_number=i)
+                    image_url = generate_panel_image(
+                        panel_description=desc, panel_number=i
+                    )
                     image_urls.append(image_url)
                     time.sleep(0.5)  # Optional: prevent rate limits
                 except Exception as e:
@@ -202,7 +204,6 @@ def generate_comic(
     except Exception as e:
         print(f"Error during comic script generation: {e}")
         return None, None, None
-
 
 
 # --- Panel Image Generation ---
@@ -245,7 +246,7 @@ def generate_panel_image(
     try:
         prompt = f"{panel_description}. {style_description}"
         panel_start_time = time.time()
-        
+
         files = {
             "prompt": (None, prompt),
             "steps": (None, "15"),
@@ -253,7 +254,7 @@ def generate_panel_image(
             "height": (None, "512"),
             "samples": (None, "1"),
             "cfg_scale": (None, "7"),
-            "scheduler": "euler_a", 
+            "scheduler": "euler_a",
         }
 
         response = requests.post(
@@ -265,8 +266,7 @@ def generate_panel_image(
             files=files,
             timeout=45,
         )
-        
-        
+
         panel_time = time.time() - panel_start_time
 
         print(f"Debug - Response Status: {response.status_code}")
@@ -274,12 +274,12 @@ def generate_panel_image(
         if response.status_code == 200:
             data = response.json()
             print("Debug - Response keys:", list(data.keys()))  # See what keys exist
-            
+
             # IMMEDIATE MEMORY CLEANUP
             gc.collect()
             # Try different possible response structures
             img_b64 = None
-            
+
             # Option 1: artifacts (old format)
             if "artifacts" in data and data["artifacts"]:
                 img_b64 = data["artifacts"][0]["base64"]
@@ -292,7 +292,7 @@ def generate_panel_image(
             # Option 4: direct base64 field
             elif "base64" in data:
                 img_b64 = data["base64"]
-            
+
             if img_b64:
                 image_url = save_base64_image_to_supabase(img_b64, panel_number)
                 if image_url:
@@ -354,13 +354,16 @@ def extract_title_from_script(script: str) -> str | None:
             if (
                 line
                 and len(line) > 10
-                and not line.lower().startswith(("panel", "scene", "dialogue", "narration"))
+                and not line.lower().startswith(
+                    ("panel", "scene", "dialogue", "narration")
+                )
             ):
                 return line[:50] + ("..." if len(line) > 50 else "")
         return None
     except Exception as e:
         print(f"Error extracting title: {e}")
         return None
+
 
 def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
     descriptions = []
@@ -384,6 +387,7 @@ def extract_panel_descriptions(script: str, num_panels=4) -> list[str]:
     while len(descriptions) < num_panels:
         descriptions.append("A generic educational comic panel for Ghanaian children.")
     return descriptions[:num_panels]
+
 
 def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
     """
@@ -485,6 +489,7 @@ def extract_panel_texts(script: str, num_panels=4) -> list[dict]:
     # Truncate if we have too many panels
     return panels[:num_panels]
 
+
 def extract_panel_texts_robust(script: str, num_panels=4) -> list[dict]:
     """
     More robust version that handles different script formatting styles.
@@ -577,6 +582,7 @@ def save_image(
         print(f"Error saving image {file_path}: {e}")
         return None
 
+
 def save_base64_image_to_supabase(b64_string: str, panel_number: int) -> str:
     """Save a base64 string as an image to Supabase Storage and return its public URL."""
     try:
@@ -592,16 +598,14 @@ def save_base64_image_to_supabase(b64_string: str, panel_number: int) -> str:
         # Decode the base64 string
         image_data = base64.b64decode(b64_string)
 
-       # Upload to Supabase Storage
+        # Upload to Supabase Storage
         try:
-            result = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
-                filename,
-                image_data,
-                file_options={"content-type": "image/png"}
-            )
+            result = supabase_client.storage.from_(
+                settings.SUPABASE_STORAGE_BUCKET
+            ).upload(filename, image_data, file_options={"content-type": "image/png"})
 
             # Handle different response formats from Supabase
-            if hasattr(result, 'status_code'):
+            if hasattr(result, "status_code"):
                 if result.status_code == 200:
                     public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
                     return public_url
@@ -620,32 +624,35 @@ def save_base64_image_to_supabase(b64_string: str, panel_number: int) -> str:
     except Exception as e:
         print(f"Error saving image to Supabase: {e}")
         return None
-    
+
+
 def save_pil_image_to_supabase(pil_image, filename_prefix: str) -> str:
     """Save a PIL Image to Supabase Storage and return its public URL."""
     try:
         from io import BytesIO
-        
+
         # Convert PIL image to bytes
         img_buffer = BytesIO()
-        pil_image.save(img_buffer, format='PNG')
+        pil_image.save(img_buffer, format="PNG")
         img_buffer.seek(0)
-        
+
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = uuid.uuid4().hex[:8]
         filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
-        
+
         # Upload to Supabase
         try:
-            result = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+            result = supabase_client.storage.from_(
+                settings.SUPABASE_STORAGE_BUCKET
+            ).upload(
                 filename,
                 img_buffer.getvalue(),
-                file_options={"content-type": "image/png"}
+                file_options={"content-type": "image/png"},
             )
-            
+
             # Handle response
-            if hasattr(result, 'status_code'):
+            if hasattr(result, "status_code"):
                 if result.status_code == 200:
                     public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
                     return public_url
@@ -656,11 +663,11 @@ def save_pil_image_to_supabase(pil_image, filename_prefix: str) -> str:
                 # Assume success
                 public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/{filename}"
                 return public_url
-                
+
         except Exception as upload_error:
             print(f"Error uploading to Supabase: {upload_error}")
             return None
-            
+
     except Exception as e:
         print(f"Error saving PIL image to Supabase: {e}")
         return None
@@ -704,7 +711,18 @@ def wrap_text(draw, text, font, max_width):
         lines.append(" ".join(current_line))
     return lines
 
-def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner_radius=20, tail_side='left'):
+
+def draw_speech_bubble(
+    draw,
+    text,
+    x,
+    y,
+    font,
+    max_width=280,
+    padding=12,
+    corner_radius=20,
+    tail_side="left",
+):
     """Draws a traditional comic-style speech bubble and returns total height used."""
     if not text:
         return 0
@@ -715,7 +733,9 @@ def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner
 
     # Calculate bubble dimensions
     line_height = font.getbbox("A")[3] - font.getbbox("A")[1]
-    bubble_width = max([draw.textlength(line, font=font) for line in lines]) + padding * 2
+    bubble_width = (
+        max([draw.textlength(line, font=font) for line in lines]) + padding * 2
+    )
     bubble_height = len(lines) * (line_height + 4) + padding * 2
 
     # Bubble rectangle position
@@ -732,19 +752,19 @@ def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner
         radius=corner_radius,
         fill="white",
         outline="black",
-        width=2
+        width=2,
     )
 
     # Draw tail (triangle)
-    if tail_side == 'left':
+    if tail_side == "left":
         tail_base_x = rect_x0 + 30
-    elif tail_side == 'right':
+    elif tail_side == "right":
         tail_base_x = rect_x1 - 30
     else:
         tail_base_x = (rect_x0 + rect_x1) // 2
 
     tail_points = [
-        (tail_base_x, rect_y1),                         # Bottom center of bubble
+        (tail_base_x, rect_y1),  # Bottom center of bubble
         (tail_base_x - tail_width // 2, rect_y1 + tail_height),
         (tail_base_x + tail_width // 2, rect_y1 + tail_height),
     ]
@@ -759,7 +779,6 @@ def draw_speech_bubble(draw, text, x, y, font, max_width=280, padding=12, corner
         current_y += line_height + 4
 
     return bubble_height + tail_height
-
 
 
 def draw_caption(draw, text, x, y, width, font, padding=10):
@@ -804,18 +823,24 @@ def wrap_text_for_title(draw, text, font, max_width):
 
     return lines
 
+
 def create_and_upload_placeholder(panel_number: int) -> str:
     """Create a placeholder image and upload it to Supabase"""
     try:
         from PIL import Image, ImageDraw, ImageFont
-        
+
         # Create placeholder image
         img = Image.new("RGB", (400, 600), color="lightgray")
         draw = ImageDraw.Draw(img)
-        
+
         try:
             # Try different font names for cross-platform compatibility
-            font_names = ["arial.ttf", "Arial.ttf", "DejaVuSans.ttf", "liberation-sans.ttf"]
+            font_names = [
+                "arial.ttf",
+                "Arial.ttf",
+                "DejaVuSans.ttf",
+                "liberation-sans.ttf",
+            ]
             font = None
             for font_name in font_names:
                 try:
@@ -823,23 +848,26 @@ def create_and_upload_placeholder(panel_number: int) -> str:
                     break
                 except:
                     continue
-            
+
             if font is None:
                 font = ImageFont.load_default()
         except:
             font = ImageFont.load_default()
-        
+
         draw.text((100, 280), f"Panel {panel_number + 1}", fill="black", font=font)
         draw.text((120, 320), "No Image", fill="black", font=font)
-        
+
         # Upload to Supabase
-        placeholder_url = save_pil_image_to_supabase(img, f"placeholder_panel_{panel_number}")
+        placeholder_url = save_pil_image_to_supabase(
+            img, f"placeholder_panel_{panel_number}"
+        )
         return placeholder_url
-        
+
     except Exception as e:
         print(f"Error creating placeholder: {e}")
         # Return a fallback URL or None
         return None
+
 
 def stitch_panels(
     image_urls: list[str],
@@ -860,7 +888,7 @@ def stitch_panels(
         for url in image_urls:
             print(f"Loading image from: {url}")
             try:
-                if url.startswith(('http://', 'https://')):
+                if url.startswith(("http://", "https://")):
                     # It's a URL, use requests
                     response = requests.get(url, stream=True, timeout=30)
                     response.raise_for_status()
@@ -870,21 +898,21 @@ def stitch_panels(
                     if not os.path.isabs(url):
                         # Convert relative path to absolute path
                         if url.startswith(settings.MEDIA_URL):
-                            relative_path = url.replace(settings.MEDIA_URL, '', 1)
+                            relative_path = url.replace(settings.MEDIA_URL, "", 1)
                             file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
                         else:
                             file_path = os.path.join(settings.MEDIA_ROOT, url)
                     else:
                         file_path = url
-                    
+
                     if not os.path.exists(file_path):
                         print(f"File not found: {file_path}")
                         raise FileNotFoundError(f"File not found: {file_path}")
-                    
+
                     img = Image.open(file_path).convert("RGB")
-                
+
                 panel_images.append(img)
-                
+
             except Exception as e:
                 print(f"Error loading image {url}: {e}")
                 # Create a placeholder for failed images
@@ -892,7 +920,7 @@ def stitch_panels(
                 draw = ImageDraw.Draw(placeholder)
                 draw.text((150, 300), "Image Error", fill="red")
                 panel_images.append(placeholder)
-                
+
                 # Continue with other images instead of returning None
                 continue
 
@@ -932,16 +960,17 @@ def stitch_panels(
         # Load fonts
         try:
             # Try to load better fonts with fallbacks
-            title_font = ImageFont.truetype("arial.ttf", 28)
-            font = ImageFont.truetype("arial.ttf", 16)
+            title_font = ImageFont.truetype("arial.ttf", 42)  # Increased from 28
+            font = ImageFont.truetype("arial.ttf", 24)  # Increased from 16
         except:
             try:
-                title_font = ImageFont.truetype("Arial.ttf", 28)
-                font = ImageFont.truetype("Arial.ttf", 16)
+                title_font = ImageFont.truetype("Arial.ttf", 42)
+                font = ImageFont.truetype("Arial.ttf", 24)
             except:
                 try:
-                    title_font = ImageFont.load_default()
-                    font = ImageFont.load_default()
+                    # If system fonts fail, try DejaVuSans which is commonly available
+                    title_font = ImageFont.truetype("DejaVuSans.ttf", 42)
+                    font = ImageFont.truetype("DejaVuSans.ttf", 24)
                 except:
                     # Last resort - create basic fonts
                     title_font = ImageFont.load_default()
@@ -1017,13 +1046,16 @@ def stitch_panels(
                     bubble_height = draw_speech_bubble(
                         draw,
                         dialogue_line,
-                        x + 10,
+                        x + 15,  # Increased margin
                         bubble_y + bubble_spacing,
                         font,
-                        max_width=panel_width - 40,
-                        padding=8,
+                        max_width=panel_width
+                        - 50,  # Decreased width for better margins
+                        padding=15,  # Increased padding
                     )
-                    bubble_spacing += bubble_height + 10
+                    bubble_spacing += (
+                        bubble_height + 15
+                    )  # Increased spacing between bubbles
 
             # Draw caption at bottom with better styling
             if texts.get("narration"):
@@ -1031,10 +1063,10 @@ def stitch_panels(
                     draw,
                     texts["narration"],
                     x,
-                    y + panel_height - 5,
+                    y + panel_height - 10,  # Adjusted position
                     panel_width,
                     font,
-                    padding=8,
+                    padding=12,  # Increased padding
                 )
 
         # Save stitched image
@@ -1048,9 +1080,8 @@ def stitch_panels(
         # Upload final stitched image to Supabase
         final_comic_url = save_pil_image_to_supabase(canvas, "stitched_comic")
         return final_comic_url
-    
+
         return f"{settings.MEDIA_URL}generated_images/{filename}"
     except Exception as e:
         print(f"Error stitching panels: {e}")
         return None
-
