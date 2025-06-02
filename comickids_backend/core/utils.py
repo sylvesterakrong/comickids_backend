@@ -960,17 +960,17 @@ def stitch_panels(
         # Load fonts
         try:
             # Try to load better fonts with fallbacks
-            title_font = ImageFont.truetype("arial.ttf", 42)  # Increased from 28
-            font = ImageFont.truetype("arial.ttf", 24)  # Increased from 16
+            title_font = ImageFont.truetype("arial.ttf", 38)  # Increased from 28
+            font = ImageFont.truetype("arial.ttf", 20)  # Increased from 16
         except:
             try:
-                title_font = ImageFont.truetype("Arial.ttf", 42)
-                font = ImageFont.truetype("Arial.ttf", 24)
+                title_font = ImageFont.truetype("Arial.ttf", 38)
+                font = ImageFont.truetype("Arial.ttf", 20)
             except:
                 try:
                     # If system fonts fail, try DejaVuSans which is commonly available
-                    title_font = ImageFont.truetype("DejaVuSans.ttf", 42)
-                    font = ImageFont.truetype("DejaVuSans.ttf", 24)
+                    title_font = ImageFont.truetype("DejaVuSans.ttf", 38)
+                    font = ImageFont.truetype("DejaVuSans.ttf", 20)
                 except:
                     # Last resort - create basic fonts
                     title_font = ImageFont.load_default()
