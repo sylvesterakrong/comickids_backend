@@ -917,7 +917,7 @@ def stitch_panels(
                         print(f"File not found: {file_path}")
                         raise FileNotFoundError(f"File not found: {file_path}")
 
-                    img = Image.open(file_path).convert("RGBA")
+                    img = Image.open(file_path).convert("RGB")
 
                 panel_images.append(img)
 
