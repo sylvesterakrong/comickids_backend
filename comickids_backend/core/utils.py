@@ -121,14 +121,14 @@ def generate_comic(
     Comic Script Format:
 
     Panel 1  
-    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally.]  
-    Dialogue: [Character dialogue, one line per character. Use simple and clear language for primary school students.]  
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be 2D cartoonish and not too realistic with the same design style throughout the comic.]  
+    Dialogue: [Use simple and clear language for primary school students.]  
     Narration: [Short caption to explain or support the learning objective.]
 
     Panel 2  
-    Scene Description: [Detailed and vivid illustration description.]  
-    Dialogue: [Character lines, culturally natural and child-friendly.]  
-    Narration: [Supporting text.]
+    Scene Description: [Detailed visual elements. Describe the setting, background, time of day, actions, and facial expressions of characters. Be vivid enough to help an illustrator picture the panel exactly. Include Ghanaian cultural elements naturally. Characters and scenes should be 2D cartoonish and not too realistic with the same design style throughout the comic.]  
+    Dialogue: [ Use simple and clear language for primary school students.]  
+    Narration: [Short caption to explain or support the learning objective.]
 
     [Repeat for {NUM_PANELS} panels]
 
@@ -722,6 +722,7 @@ def draw_speech_bubble(
     padding=12,
     corner_radius=20,
     tail_side="left",
+    opacity=190
 ):
     """Draws a traditional comic-style speech bubble and returns total height used."""
     if not text:
@@ -731,50 +732,57 @@ def draw_speech_bubble(
     if not lines:
         return 0
 
-    # Calculate bubble dimensions
+    # Calculate dimensions (unchanged)
     line_height = font.getbbox("A")[3] - font.getbbox("A")[1]
     bubble_width = (
         max([draw.textlength(line, font=font) for line in lines]) + padding * 2
     )
     bubble_height = len(lines) * (line_height + 4) + padding * 2
 
-    # Bubble rectangle position
-    rect_x0, rect_y0 = x, y
-    rect_x1, rect_y1 = x + bubble_width, y + bubble_height
+    # Create a transparent bubble overlay
+    bubble_overlay = Image.new('RGBA', (int(bubble_width), int(bubble_height)), (255, 255, 255, 0))
+    bubble_draw = ImageDraw.Draw(bubble_overlay)
 
-    # Tail dimensions
-    tail_height = 20
-    tail_width = 25
-
-    # Draw bubble (rounded rectangle)
-    draw.rounded_rectangle(
-        [rect_x0, rect_y0, rect_x1, rect_y1],
+    # Draw the bubble on the overlay
+    bubble_draw.rounded_rectangle(
+        [0, 0, bubble_width-1, bubble_height-1],
         radius=corner_radius,
-        fill="white",
-        outline="black",
-        width=2,
+        fill=(255, 255, 255, opacity),  # White with transparency
+        outline=(0, 0, 0, 255),         # Solid black outline
+        width=2
     )
 
-    # Draw tail (triangle)
+# Paste the semi-transparent bubble
+    draw.image.paste(bubble_overlay, (x, y), bubble_overlay)
+
+    # Draw tail (triangle) with transparency
+    tail_height = 20
+    tail_width = 25
     if tail_side == "left":
-        tail_base_x = rect_x0 + 30
+        tail_base_x = x + 30
     elif tail_side == "right":
-        tail_base_x = rect_x1 - 30
+        tail_base_x = x + bubble_width - 30
     else:
-        tail_base_x = (rect_x0 + rect_x1) // 2
+        tail_base_x = x + bubble_width // 2
 
+    # Create transparent tail
     tail_points = [
-        (tail_base_x, rect_y1),  # Bottom center of bubble
-        (tail_base_x - tail_width // 2, rect_y1 + tail_height),
-        (tail_base_x + tail_width // 2, rect_y1 + tail_height),
+        (tail_base_x, y + bubble_height),
+        (tail_base_x - tail_width // 2, y + bubble_height + tail_height),
+        (tail_base_x + tail_width // 2, y + bubble_height + tail_height),
     ]
-    draw.polygon(tail_points, fill="white", outline="black")
+    
+    # Draw tail with transparency
+    tail_overlay = Image.new('RGBA', draw.image.size, (255, 255, 255, 0))
+    tail_draw = ImageDraw.Draw(tail_overlay)
+    tail_draw.polygon(tail_points, fill=(255, 255, 255, opacity), outline=(0, 0, 0, 255))
+    draw.image.alpha_composite(tail_overlay)
 
-    # Draw text inside the bubble
-    current_y = rect_y0 + padding
+    # Draw text (solid black)
+    current_y = y + padding
     for line in lines:
         text_width = draw.textlength(line, font=font)
-        text_x = rect_x0 + (bubble_width - text_width) // 2
+        text_x = x + (bubble_width - text_width) // 2
         draw.text((text_x, current_y), line, fill="black", font=font)
         current_y += line_height + 4
 
@@ -909,7 +917,7 @@ def stitch_panels(
                         print(f"File not found: {file_path}")
                         raise FileNotFoundError(f"File not found: {file_path}")
 
-                    img = Image.open(file_path).convert("RGB")
+                    img = Image.open(file_path).convert("RGBA")
 
                 panel_images.append(img)
 
@@ -954,7 +962,7 @@ def stitch_panels(
         panel_images = [img.resize((panel_width, panel_height)) for img in panel_images]
 
         # Create canvas with black background for margins
-        canvas = Image.new("RGB", (total_width, total_height), "black")
+        canvas = Image.new("RGBA", (total_width, total_height), (0, 0, 0, 255))
         draw = ImageDraw.Draw(canvas)
 
         # Load fonts
