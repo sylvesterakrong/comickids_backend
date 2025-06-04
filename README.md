@@ -113,6 +113,8 @@ comickids_backend/
 
 This project is licensed under the Apache License - see the [LICENSE](LICENSE) file for details.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sylvesterakrong/comickids_backend)
+
 ## 🙏 Acknowledgements
 
 - [Google Gemini](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini)
